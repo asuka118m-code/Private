@@ -1,7 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseRecipeHtml, parseRecipeText } from "./parse.mjs";
+import { parseRecipeHtml, parseRecipeText, parseRecipesText } from "./parse.mjs";
 import { aiAvailable, extractWithClaude } from "./ai.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,25 +29,31 @@ app.post("/api/import/url", async (req, res) => {
     });
     if (!r.ok) throw new Error(`ページを取得できませんでした (${r.status})`);
     const parsed = parseRecipeHtml(await r.text(), target.href);
-    if (parsed.found) return res.json({ ...parsed, method: "structured" });
+    if (parsed.found) {
+      const { found, imageUrl, ...recipe } = parsed;
+      return res.json({ recipes: [recipe], imageUrl, method: "structured" });
+    }
     if (aiAvailable() && parsed.pageText) {
-      const ai = await extractWithClaude({ text: parsed.pageText });
-      return res.json({ ...ai, imageUrl: parsed.imageUrl, method: "ai" });
+      const recipes = await extractWithClaude({ text: parsed.pageText });
+      return res.json({ recipes: recipes.slice(0, 1), imageUrl: parsed.imageUrl, method: "ai" });
     }
     const guess = parseRecipeText(parsed.pageText || "");
-    return res.json({ ...guess, title: parsed.title || guess.title, imageUrl: parsed.imageUrl, method: "text" });
+    return res.json({ recipes: [{ ...guess, title: parsed.title || guess.title }], imageUrl: parsed.imageUrl, method: "text" });
   } catch (e) {
     res.status(502).json({ error: errMsg(e) });
   }
 });
 
-// テキスト（SNSの投稿文のコピーなど）から取り込み
+// テキスト（SNSの投稿文のコピー・複数レシピのまとめ書きなど）から取り込み
+// mode: "rule"=AIを使わない（無料） / "ai"=AIで整形 / 省略時はAI設定があればAI
 app.post("/api/import/text", async (req, res) => {
-  const { text } = req.body ?? {};
+  const { text, mode } = req.body ?? {};
   if (!text?.trim()) return res.status(400).json({ error: "テキストが空です" });
   try {
-    if (aiAvailable()) return res.json({ ...(await extractWithClaude({ text })), method: "ai" });
-    res.json({ ...parseRecipeText(text), method: "text" });
+    const useAi = mode === "ai" || (mode !== "rule" && aiAvailable());
+    if (useAi && !aiAvailable()) return res.status(501).json({ error: "AI設定（ANTHROPIC_API_KEY）がありません" });
+    if (useAi) return res.json({ recipes: await extractWithClaude({ text }), method: "ai" });
+    res.json({ recipes: parseRecipesText(text), method: "text" });
   } catch (e) {
     res.status(502).json({ error: errMsg(e) });
   }
@@ -59,7 +65,7 @@ app.post("/api/import/image", async (req, res) => {
   if (!Array.isArray(images) || !images.length) return res.status(400).json({ error: "画像がありません" });
   if (!aiAvailable()) return res.status(501).json({ error: "スクショの読み取りにはAI設定（ANTHROPIC_API_KEY）が必要です" });
   try {
-    res.json({ ...(await extractWithClaude({ images })), method: "ai" });
+    res.json({ recipes: await extractWithClaude({ images }), method: "ai" });
   } catch (e) {
     res.status(502).json({ error: errMsg(e) });
   }

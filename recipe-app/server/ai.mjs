@@ -1,7 +1,7 @@
 // Claude API による抽出（ANTHROPIC_API_KEY 等の認証情報がある場合のみ使用）
 import Anthropic from "@anthropic-ai/sdk";
 
-const SCHEMA = {
+const RECIPE = {
   type: "object",
   properties: {
     title: { type: "string" },
@@ -24,11 +24,19 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+const SCHEMA = {
+  type: "object",
+  properties: { recipes: { type: "array", items: RECIPE } },
+  required: ["recipes"],
+  additionalProperties: false,
+};
+
 const SYSTEM = `あなたは料理レシピの整理係です。与えられた画像やテキストからレシピを読み取り、JSONで返します。
 - 材料は1つずつ分け、分量は amount に入れる（「大さじ1」「200g」「少々」など原文どおり）。
 - 調味料のまとまり（A、合わせ調味料など）は名前に「(A) 醤油」のように付記する。
 - 手順は作る順に1ステップずつ。番号や「STEP」は付けない。
 - 書かれていない材料や手順を創作しない。レシピが読み取れない場合は空配列にする。
+- 複数のレシピが含まれていれば、それぞれ別のレシピとして recipes に入れる。
 - 日本語で出力する。`;
 
 let client;
@@ -58,5 +66,5 @@ export async function extractWithClaude({ text, images = [] }) {
   if (response.stop_reason === "max_tokens") throw new Error("レシピが長すぎて解析しきれませんでした");
   const out = response.content.find((b) => b.type === "text");
   if (!out) throw new Error("AIの応答が空でした");
-  return JSON.parse(out.text);
+  return JSON.parse(out.text).recipes ?? [];
 }

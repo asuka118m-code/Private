@@ -86,3 +86,8 @@ textarea.input { resize: vertical; }
 .source-link { color: var(--accent); word-break: break-all; font-size: 14px; }
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); display: grid; place-items: center; z-index: 20; }
 .lightbox img { max-width: 100vw; max-height: 100vh; object-fit: contain; }
+.check { display: flex; align-items: center; gap: 6px; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.preview.off { opacity: .5; }
+.ingredients.mini li { padding: 4px 2px; font-size: 14px; }
+button.back { background: none; border: 0; padding: 0; text-decoration: none; }

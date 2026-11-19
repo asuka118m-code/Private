@@ -1,11 +1,15 @@
 import type { Ingredient } from "./types";
 import { blobToBase64, shrinkImage } from "./image";
 
-export interface ImportResult {
+export interface ImportedRecipe {
   title: string;
   servings?: string;
   ingredients: Ingredient[];
   steps: string[];
+}
+
+export interface ImportResult {
+  recipes: ImportedRecipe[];
   imageUrl?: string;
   method: "structured" | "ai" | "text";
 }
@@ -18,7 +22,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const importFromUrl = (url: string) => post<ImportResult>("/api/import/url", { url });
-export const importFromText = (text: string) => post<ImportResult>("/api/import/text", { text });
+export const importFromText = (text: string, mode: "rule" | "ai") => post<ImportResult>("/api/import/text", { text, mode });
 export async function importFromImages(images: Blob[]) {
   const payload = await Promise.all(images.map(async (b) => blobToBase64(await shrinkImage(b, 1568, 0.9))));
   return post<ImportResult>("/api/import/image", { images: payload });

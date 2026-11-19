@@ -27,6 +27,50 @@ const stripStepNumber = (s) =>
     .replace(/^\s*(?:STEP\s*)?(?:[0-9０-９]+|[①-⑳])\s*[.．、)）:：]?\s*/i, "")
     .trim();
 
+const MARK = "[【\\[\\(（<＜■□◆◇●○★☆▼▽▶︎・]*\\s*";
+const ingHead = new RegExp(`^${MARK}(材料|用意するもの|ingredients)`, "i");
+const stepHead = new RegExp(`^${MARK}(作り方|つくり方|手順|レシピ(?!名)|how to|steps?|directions|instructions)`, "i");
+const TITLE_HEAD = new RegExp(`^${MARK}(レシピ名|料理名|タイトル|メニュー名)\\s*[:：】\\]）)>＞]?\\s*(.*?)\\s*[】\\]]?$`);
+const SEPARATOR = /^(?:[-－ー=＝_＿~〜*＊]\s*){3,}$/;
+const NUMBERED = /^(?:STEP\s*)?(?:[0-9０-９]+[.．、)）:：]|[①-⑳])/i;
+
+/**
+ * 複数レシピがまとめて書かれたテキストを1件ずつに分ける。
+ * 区切り: 「レシピ名：」「料理名：」行 / 「---」「===」などの区切り線 /
+ *        作り方の後に再び「材料」見出しが来たら、その直前の行を次のレシピ名とみなす
+ */
+export function splitRecipeBlocks(text) {
+  const lines = String(text).split(/\r?\n/).map((l) => l.trim());
+  const blocks = [];
+  let cur = [];
+  let sawSteps = false;
+  const flush = () => { if (cur.some(Boolean)) blocks.push(cur); cur = []; sawSteps = false; };
+  for (const line of lines) {
+    if (SEPARATOR.test(line)) { flush(); continue; }
+    if (TITLE_HEAD.test(line)) { flush(); cur.push(line); continue; }
+    if (ingHead.test(line) && sawSteps) {
+      // 直前の行が見出しや番号付き手順でなければ、それを次のレシピ名として持っていく
+      let i = cur.length - 1;
+      while (i >= 0 && !cur[i]) i--;
+      const prev = cur[i];
+      const carry = prev && !NUMBERED.test(prev) && !stepHead.test(prev) ? cur.splice(i) : [];
+      flush();
+      cur.push(...carry);
+    }
+    if (stepHead.test(line)) sawSteps = true;
+    cur.push(line);
+  }
+  flush();
+  return blocks.map((b) => b.join("\n"));
+}
+
+/** 複数レシピ対応のテキスト解析。材料も手順も無いブロックは捨てる */
+export function parseRecipesText(text) {
+  return splitRecipeBlocks(text)
+    .map(parseRecipeText)
+    .filter((r) => r.ingredients.length || r.steps.length);
+}
+
 /** SNSのキャプションなど、プレーンテキストからレシピを推測 */
 export function parseRecipeText(text) {
   const lines = String(text)
@@ -38,9 +82,9 @@ export function parseRecipeText(text) {
   const ingredients = [];
   const steps = [];
   let mode = "none";
-  const ingHead = /^[【\[\(（<＜■□◆●★☆▼▽]*\s*(材料|用意するもの|ingredients)/i;
-  const stepHead = /^[【\[\(（<＜■□◆●★☆▼▽]*\s*(作り方|つくり方|手順|レシピ|how to|steps?|directions|instructions)/i;
   for (const line of lines) {
+    const t = line.match(TITLE_HEAD);
+    if (t) { if (!title) title = t[2].trim(); continue; }
     if (ingHead.test(line)) {
       mode = "ing";
       servings ||= line.match(/[0-9０-９〜~\-]+\s*(?:人分|人前|個分|皿分)/)?.[0] ?? "";

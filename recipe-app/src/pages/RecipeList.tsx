@@ -18,6 +18,7 @@ export function RecipeList() {
     <div className="page">
       <header className="topbar">
         <h1>レシピ帳</h1>
+        <Link to="/settings" className="btn small">バックアップ</Link>
       </header>
       <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
       {shown && shown.length === 0 && (
