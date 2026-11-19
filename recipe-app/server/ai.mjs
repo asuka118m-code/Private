@@ -53,16 +53,15 @@ export async function extractWithClaude({ text, images = [] }) {
     })),
     { type: "text", text: text ? `以下からレシピを抽出してください。\n\n${text}` : "この画像からレシピを抽出してください。" },
   ];
-  const response = await client.beta.messages.create({
-    model: process.env.CLAUDE_MODEL || "claude-opus-5-5",
+  // 軽量・低価格の Claude Haiku 5.5（環境変数 CLAUDE_MODEL で変更可）
+  const response = await client.messages.create({
+    model: process.env.CLAUDE_MODEL || "claude-haiku-5-5",
     max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
     system: SYSTEM,
     messages: [{ role: "user", content }],
   });
-  if (response.stop_reason === "refusal") throw new Error("AIが解析を断りました");
+  if (response.stop_reason === "refusal") throw new Error("AIがこの内容の解析を断りました。テキスト貼り付けでお試しください");
   if (response.stop_reason === "max_tokens") throw new Error("レシピが長すぎて解析しきれませんでした");
   const out = response.content.find((b) => b.type === "text");
   if (!out) throw new Error("AIの応答が空でした");

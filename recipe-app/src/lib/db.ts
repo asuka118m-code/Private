@@ -4,15 +4,35 @@ import type { Recipe, RecipeDraft } from "./types";
 interface RecipeDB extends DBSchema {
   recipes: { key: string; value: Recipe; indexes: { updatedAt: number } };
   images: { key: string; value: { id: string; blob: Blob } };
+  // --- 同期用 ---
+  meta: { key: string; value: { key: string; value: unknown } };
+  tombstones: { key: string; value: { id: string; deletedAt: number } }; // 削除したレシピ（クラウドへ伝える）
+  imageDeletes: { key: string; value: { id: string } }; // 削除した画像（クラウドから消す）
+  syncedImages: { key: string; value: { id: string } }; // クラウドにアップ済みの画像
 }
 
-const dbPromise = openDB<RecipeDB>("recipe-app", 1, {
-  upgrade(db) {
-    const s = db.createObjectStore("recipes", { keyPath: "id" });
-    s.createIndex("updatedAt", "updatedAt");
-    db.createObjectStore("images", { keyPath: "id" });
+const dbPromise = openDB<RecipeDB>("recipe-app", 2, {
+  upgrade(db, oldVersion) {
+    if (oldVersion < 1) {
+      const s = db.createObjectStore("recipes", { keyPath: "id" });
+      s.createIndex("updatedAt", "updatedAt");
+      db.createObjectStore("images", { keyPath: "id" });
+    }
+    if (oldVersion < 2) {
+      db.createObjectStore("meta", { keyPath: "key" });
+      db.createObjectStore("tombstones", { keyPath: "id" });
+      db.createObjectStore("imageDeletes", { keyPath: "id" });
+      db.createObjectStore("syncedImages", { keyPath: "id" });
+    }
   },
 });
+export const getDb = () => dbPromise;
+
+// データが変わったら通知（同期の起動・画面の再読み込みに使う）
+type Listener = (source: "local" | "sync") => void;
+const listeners = new Set<Listener>();
+export const onDataChange = (l: Listener) => (listeners.add(l), () => void listeners.delete(l));
+export const emitChange = (source: "local" | "sync") => listeners.forEach((l) => l(source));
 
 export const newId = () => crypto.randomUUID();
 
@@ -26,17 +46,23 @@ export async function getRecipe(id: string) {
 }
 
 export async function saveRecipe(recipe: Recipe) {
-  const r = { ...recipe, updatedAt: Date.now() };
+  const r = { ...recipe, updatedAt: Math.max(Date.now(), recipe.updatedAt + 1) };
   await (await dbPromise).put("recipes", r);
+  emitChange("local");
   return r;
 }
 
 export async function deleteRecipe(recipe: Recipe) {
   const db = await dbPromise;
-  const tx = db.transaction(["recipes", "images"], "readwrite");
-  for (const id of [...recipe.sourceImageIds, ...recipe.photoIds]) tx.objectStore("images").delete(id);
+  const tx = db.transaction(["recipes", "images", "tombstones", "imageDeletes"], "readwrite");
+  for (const id of [...recipe.sourceImageIds, ...recipe.photoIds]) {
+    tx.objectStore("images").delete(id);
+    tx.objectStore("imageDeletes").put({ id });
+  }
   tx.objectStore("recipes").delete(recipe.id);
+  tx.objectStore("tombstones").put({ id: recipe.id, deletedAt: Date.now() });
   await tx.done;
+  emitChange("local");
 }
 
 export async function putImage(blob: Blob) {
@@ -50,7 +76,9 @@ export async function getImage(id: string) {
 }
 
 export async function deleteImage(id: string) {
-  await (await dbPromise).delete("images", id);
+  const db = await dbPromise;
+  await db.delete("images", id);
+  await db.put("imageDeletes", { id });
 }
 
 export function coverOf(r: Recipe) {
@@ -82,9 +110,11 @@ export async function mergeData(recipes: Recipe[], images: { id: string; blob: B
   for (const img of images) await tx.objectStore("images").put(img);
   for (const r of recipes) {
     const cur = await tx.objectStore("recipes").get(r.id);
-    if (!cur) { await tx.objectStore("recipes").put(r); added++; }
-    else if (r.updatedAt > cur.updatedAt) { await tx.objectStore("recipes").put(r); updated++; }
+    // 復元したものも同期で他の端末へ送られるよう、更新日時を今にする
+    if (!cur) { await tx.objectStore("recipes").put({ ...r, updatedAt: Date.now() }); added++; }
+    else if (r.updatedAt > cur.updatedAt) { await tx.objectStore("recipes").put({ ...r, updatedAt: Date.now() }); updated++; }
   }
   await tx.done;
+  emitChange("local");
   return { added, updated };
 }

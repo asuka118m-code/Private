@@ -15,7 +15,7 @@
 - **編集・削除**：材料と手順の追加・並べ替え・削除
 - **感想コメント**：★評価つきで何度でも残せる。編集画面に過去の感想が出るので、改善に使える
 
-データは端末内（ブラウザのIndexedDB）に保存されます。「バックアップ」画面から全データを1ファイルに書き出し・復元できます（別端末への移行にも使用可）。
+データは端末内（ブラウザのIndexedDB）に保存され、ログインするとSupabaseを通じて他の端末と自動同期されます（同じレシピを2台で変更した場合は後から変更した方が残ります）。「バックアップ」画面から全データを1ファイルに書き出し・復元できます（別端末への移行にも使用可）。
 
 ## 起動
 ```bash
@@ -24,7 +24,7 @@ npm run build
 ANTHROPIC_API_KEY=sk-ant-... npm start   # http://localhost:3000
 ```
 - `ANTHROPIC_API_KEY` がなくても動きます。ただしスクショの読み取りはできず、URL・テキストの取り込みはルールベースの推測になります。
-- AIはClaude（既定 `claude-opus-5-5`、`CLAUDE_MODEL` で変更可）を使います。
+- AIはClaude（既定は軽量・低価格の `claude-haiku-5-5`、`CLAUDE_MODEL` で変更可）を使います。
 - 開発時：`npm run dev`（Vite + APIサーバー）、テスト：`npm test`
 
-スマホで使うにはHTTPSで公開する必要があります（Render・Railway・Fly.ioなど、Nodeが動くサービスならデプロイ可）。
+公開（Vercel）と同期（Supabase）の手順は [SETUP.md](SETUP.md) を見てください。

@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { coverOf, listRecipes } from "../lib/db";
+import { coverOf, listRecipes, onDataChange } from "../lib/db";
+import { useSyncState } from "../lib/useSync";
 import type { Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 
 export function RecipeList() {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [q, setQ] = useState("");
-  useEffect(() => { listRecipes().then(setRecipes); }, []);
+  const sync = useSyncState();
+  useEffect(() => {
+    listRecipes().then(setRecipes);
+    return onDataChange(() => listRecipes().then(setRecipes));
+  }, []);
   const shown = useMemo(() => {
     const k = q.trim();
     if (!recipes || !k) return recipes;
@@ -18,8 +23,13 @@ export function RecipeList() {
     <div className="page">
       <header className="topbar">
         <h1>レシピ帳</h1>
-        <Link to="/settings" className="btn small">バックアップ</Link>
+        <Link to="/settings" className="btn small">
+          {!sync.enabled ? "設定" : !sync.session ? "ログイン" : sync.status === "syncing" ? "同期中…" : sync.status === "error" ? "⚠ 同期エラー" : "☁ 同期済み"}
+        </Link>
       </header>
+      {sync.enabled && !sync.session && (
+        <Link to="/settings" className="notice">ログインすると、iPhone・iPadなど複数の端末でレシピが同期されます ›</Link>
+      )}
       <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
       {shown && shown.length === 0 && (
         <div className="empty">

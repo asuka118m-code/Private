@@ -91,3 +91,4 @@ textarea.input { resize: vertical; }
 .preview.off { opacity: .5; }
 .ingredients.mini li { padding: 4px 2px; font-size: 14px; }
 button.back { background: none; border: 0; padding: 0; text-decoration: none; }
+.notice { display: block; background: #fff1e6; color: #a2501f; border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 10px; }

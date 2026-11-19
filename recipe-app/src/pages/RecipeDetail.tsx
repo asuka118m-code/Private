@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { coverOf, deleteRecipe, getRecipe, newId, putImage, saveRecipe } from "../lib/db";
+import { coverOf, deleteRecipe, getRecipe, newId, onDataChange, putImage, saveRecipe } from "../lib/db";
 import type { Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 import { ImagePicker } from "../components/ImagePicker";
@@ -16,7 +16,12 @@ export function RecipeDetail() {
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
 
-  useEffect(() => { if (id) getRecipe(id).then((x) => (x ? setR(x) : nav("/"))); }, [id, nav]);
+  useEffect(() => {
+    if (!id) return;
+    const load = () => getRecipe(id).then((x) => (x ? setR(x) : nav("/")));
+    load();
+    return onDataChange((src) => src === "sync" && load());
+  }, [id, nav]);
   if (!r) return null;
 
   const update = async (patch: Partial<Recipe>) => setR(await saveRecipe({ ...r, ...patch }));

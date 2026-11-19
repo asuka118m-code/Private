@@ -7,6 +7,9 @@ import { RecipeEdit } from "./pages/RecipeEdit";
 import { ImportPage } from "./pages/ImportPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import "./styles.css";
+import { initSync } from "./lib/useSync";
+
+initSync();
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) navigator.serviceWorker.register("/sw.js");
 
