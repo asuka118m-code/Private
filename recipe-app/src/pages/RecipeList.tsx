@@ -52,7 +52,7 @@ export function RecipeList() {
   return (
     <div className="page">
       <header className="topbar">
-        <h1>レシピ帳</h1>
+        <h1>あじめも</h1>
         <Link to="/settings" className="btn small">
           {!sync.enabled ? "設定" : !sync.session ? "ログイン" : sync.status === "syncing" ? "同期中…" : sync.status === "error" ? "⚠ 同期エラー" : "☁ 同期済み"}
         </Link>

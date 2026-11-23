@@ -33,7 +33,7 @@ export async function exportBackup() {
     images: await Promise.all(images.map(async (i) => ({ id: i.id, type: i.blob.type, data: await toBase64(i.blob) }))),
   };
   const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
-  const name = `recipes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const name = `ajimemo-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const f = new File([blob], name, { type: "application/json" });
   // 共有シートが使える端末（iPhone/iPad等）では共有から保存先を選べる
   if (navigator.canShare?.({ files: [f] })) {
