@@ -7,10 +7,15 @@ import { firstNumber, formatNumber, isScalable, normalize, scaleAmount } from ".
  * 登録した分量は一切変えず、右側の「今回」欄に計算結果を出す。
  * 人数欄または好きな材料の「今回」欄に数字を入れると、全体がその比率で計算される。
  */
-export function IngredientsPanel({ ingredients, servings, renderName }: {
+export function IngredientsPanel({ ingredients, servings, renderName, initialFactor = 1, note, onFactorChange }: {
   ingredients: Ingredient[]; servings: string; renderName?: (ing: Ingredient) => ReactNode;
+  initialFactor?: number; // 親のレシピから倍率を引き継いで開く場合
+  note?: ReactNode; // 引き継いだ倍率の説明
+  onFactorChange?: (factor: number) => void;
 }) {
-  const [factor, setFactor] = useState(1);
+  const [factor, setFactorState] = useState(initialFactor);
+  const [showNote, setShowNote] = useState(initialFactor !== 1);
+  const setFactor = (f: number) => { setFactorState(f); onFactorChange?.(f); };
   const [editing, setEditing] = useState<string | null>(null); // "servings" | 材料の番号
   const [text, setText] = useState("");
 
@@ -26,12 +31,13 @@ export function IngredientsPanel({ ingredients, servings, renderName }: {
     const n = firstNumber(value);
     if (n !== null) setFactor(n / base);
   }
-  const reset = () => { setFactor(1); setEditing(null); setText(""); };
+  const reset = () => { setFactor(1); setEditing(null); setText(""); setShowNote(false); };
 
   if (ingredients.length === 0) return <p className="hint">未登録</p>;
 
   return (
     <>
+      {showNote && note && <div className="inherit-note">{note}</div>}
       {canScale && (
         <div className={`scale-bar ${changed ? "on" : ""}`}>
           {baseServings !== null ? (
