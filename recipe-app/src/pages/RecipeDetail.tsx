@@ -6,6 +6,7 @@ import { IngredientsPanel } from "../components/IngredientsPanel";
 import { MarkBadge, markColor } from "../components/Mark";
 import { scaleAmount } from "../lib/scale";
 import { ShareDialog } from "../components/ShareDialog";
+import { CookedPanel } from "../components/CookedPanel";
 import { CommentList } from "../components/CommentList";
 import { deleteSharedComment, fetchSharedComments, getOwnerName } from "../lib/share";
 import type { Comment } from "../lib/types";
@@ -113,6 +114,8 @@ export function RecipeDetail() {
           </div>
         );
       })()}
+
+      <CookedPanel recipe={r} onChange={async (next) => { await update({ cookedDates: next.cookedDates }); }} />
 
       <section className="panel">
         <h2>材料</h2>

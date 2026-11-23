@@ -25,6 +25,7 @@ export interface Recipe {
   photoIds: string[]; // 自分で作った料理の写真
   coverImageId?: string; // 一覧に表示する画像（未指定なら自動）
   categoryIds?: string[]; // 入っているカテゴリ（複数可）
+  cookedDates?: string[]; // 実際に作った日（"2026-11-23" の形、新しい順）
   memo: string;
   comments: Comment[];
   createdAt: number;

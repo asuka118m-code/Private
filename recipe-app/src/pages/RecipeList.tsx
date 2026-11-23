@@ -4,12 +4,22 @@ import { coverOf, getSelectedCategory, listCategories, listRecipes, onDataChange
 import { useSyncState } from "../lib/useSync";
 import type { Category, Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
+import { cookedCount, daysSince, isCooked, lastCooked } from "../lib/cooked";
+
+type CookFilter = "all" | "cooked" | "notyet";
+type SortKey = "updated" | "recent" | "longago";
+const FILTER_KEY = "recipe-app:cookFilter";
+const SORT_KEY = "recipe-app:sort";
 
 export function RecipeList() {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selected, setSelected] = useState(getSelectedCategory);
   const [q, setQ] = useState("");
+  const [cook, setCook] = useState<CookFilter>(() => (localStorage.getItem(FILTER_KEY) as CookFilter) || "all");
+  const [sort, setSort] = useState<SortKey>(() => (localStorage.getItem(SORT_KEY) as SortKey) || "updated");
+  const chooseCook = (v: CookFilter) => { setCook(v); localStorage.setItem(FILTER_KEY, v); };
+  const chooseSort = (v: SortKey) => { setSort(v); localStorage.setItem(SORT_KEY, v); };
   const sync = useSyncState();
   useEffect(() => {
     const load = () => { listRecipes().then(setRecipes); listCategories().then(setCategories); };
@@ -21,13 +31,23 @@ export function RecipeList() {
   const select = (id: string) => { setSelected(id); setSelectedCategory(id); };
 
   const count = (id: string) => recipes?.filter((r) => r.categoryIds?.includes(id)).length ?? 0;
+  // カテゴリで絞った中の「作った／まだ」の数（レパートリー）
+  const inCat = useMemo(() => (recipes ?? []).filter((r) => !current || r.categoryIds?.includes(current)), [recipes, current]);
+  const cookedN = inCat.filter(isCooked).length;
+
   const shown = useMemo(() => {
-    let list = recipes;
-    if (list && current) list = list.filter((r) => r.categoryIds?.includes(current));
+    if (!recipes) return recipes;
+    let list = inCat;
+    if (cook === "cooked") list = list.filter(isCooked);
+    if (cook === "notyet") list = list.filter((r) => !isCooked(r));
     const k = q.trim();
-    if (!list || !k) return list;
-    return list.filter((r) => r.title.includes(k) || r.ingredients.some((i) => i.name.includes(k)));
-  }, [recipes, q, current]);
+    if (k) list = list.filter((r) => r.title.includes(k) || r.ingredients.some((i) => i.name.includes(k)));
+    const last = (r: Recipe) => lastCooked(r) ?? "";
+    if (sort === "recent") list = [...list].sort((a, b) => last(b).localeCompare(last(a)) || b.updatedAt - a.updatedAt);
+    // しばらく作っていない順：作ったことのあるものを古い順に。まだのものは最後
+    if (sort === "longago") list = [...list].sort((a, b) => (last(a) || "9") .localeCompare(last(b) || "9") || b.updatedAt - a.updatedAt);
+    return list;
+  }, [recipes, inCat, q, cook, sort]);
 
   return (
     <div className="page">
@@ -53,9 +73,23 @@ export function RecipeList() {
       {current && (
         <Link to={`/categories/${current}/select`} className="btn wide add-to-cat">＋ レシピを選んで「{categories.find((c) => c.id === current)?.name}」に追加</Link>
       )}
+      <div className="cook-bar">
+        <div className="seg" role="tablist">
+          <button className={cook === "all" ? "on" : ""} onClick={() => chooseCook("all")}>すべて</button>
+          <button className={cook === "cooked" ? "on" : ""} onClick={() => chooseCook("cooked")}>✓ 作った <span>{cookedN}</span></button>
+          <button className={cook === "notyet" ? "on" : ""} onClick={() => chooseCook("notyet")}>まだ <span>{inCat.length - cookedN}</span></button>
+        </div>
+        <select className="input sort" value={sort} onChange={(e) => chooseSort(e.target.value as SortKey)} aria-label="並べ方">
+          <option value="updated">新しく登録・更新した順</option>
+          <option value="recent">最近作った順</option>
+          <option value="longago">しばらく作っていない順</option>
+        </select>
+      </div>
       {shown && shown.length === 0 && (
         <div className="empty">
           {q.trim() ? "見つかりませんでした" :
+            cook === "cooked" && inCat.length ? (<>まだ「作った」記録がありません。<br />作ったらレシピの画面で「🍳 今日作った！」を押してください。</>) :
+            cook === "notyet" && inCat.length ? (<>全部作りました！🎉</>) :
             current ? (<>このカテゴリにはまだレシピがありません。<br />上の「＋ レシピを選んで追加」から入れられます。</>) :
             (<>まだレシピがありません。<br />右下の「＋」から追加しましょう。</>)}
         </div>
@@ -66,11 +100,17 @@ export function RecipeList() {
           const rating = r.comments.find((c) => c.rating)?.rating;
           return (
             <li key={r.id}>
-              <Link to={`/recipe/${r.id}`} className="card">
+              <Link to={`/recipe/${r.id}`} className="card cook-card">
                 {cover ? <StoredImage id={cover} className="card-img" /> : <div className="card-img noimg">🍳</div>}
+                {isCooked(r) ? (
+                  <span className="cook-badge done">✓ 作った {cookedCount(r)}回</span>
+                ) : (
+                  <span className="cook-badge want">作ってみたい</span>
+                )}
                 <div className="card-body">
                   <div className="card-title">{r.title || "（無題）"}</div>
                   <div className="card-meta">
+                    {sort !== "updated" && isCooked(r) && <span>{daysSince(r) === 0 ? "今日" : `${daysSince(r)}日前`}</span>}
                     {r.photoIds.length > 0 && <span>📷{r.photoIds.length}</span>}
                     {r.comments.length > 0 && <span>💬{r.comments.length}</span>}
                     {rating && <span className="stars">{"★".repeat(rating)}</span>}
