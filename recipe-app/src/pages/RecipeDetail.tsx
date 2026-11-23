@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { coverOf, deleteRecipe, getRecipe, listCategories, newId, onDataChange, putImage, saveRecipe, setSelectedCategory } from "../lib/db";
+import { Link, useLocation, useNavigate, useNavigationType, useParams } from "react-router-dom";
+import { coverOf, deleteRecipe, getRecipe, listCategories, listRecipes, newId, onDataChange, putImage, saveRecipe, setSelectedCategory } from "../lib/db";
 import type { Category, Recipe } from "../lib/types";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { StoredImage } from "../components/StoredImage";
@@ -17,13 +17,29 @@ export function RecipeDetail() {
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
   const [cats, setCats] = useState<Category[]>([]);
+  const [all, setAll] = useState<Recipe[]>([]);
+  const location = useLocation();
+  const from = (location.state as { fromId?: string; fromTitle?: string; factor?: number } | null) ?? null;
+  const inherited = from?.factor && from.factor !== 1 ? from.factor : 1;
+  // 「戻る」で戻ってきた時は、そのレシピで入れていた「今回」の分量を復元する
+  const navType = useNavigationType();
+  const savedKey = `recipe-app:factor:${id}`;
+  const restored = navType === "POP" ? Number(sessionStorage.getItem(savedKey)) || 1 : 1;
+  const startFactor = inherited !== 1 ? inherited : restored;
+  const [factor, setFactorState] = useState(startFactor);
+  useEffect(() => setFactorState(startFactor), [id, startFactor]);
+  const setFactor = (f: number) => {
+    setFactorState(f);
+    if (f === 1) sessionStorage.removeItem(savedKey); else sessionStorage.setItem(savedKey, String(f));
+  };
 
   useEffect(() => {
     if (!id) return;
     const load = () => getRecipe(id).then((x) => (x ? setR(x) : nav("/")));
     load();
     listCategories().then(setCats);
-    return onDataChange((src) => { if (src === "sync") load(); listCategories().then(setCats); });
+    listRecipes().then(setAll);
+    return onDataChange((src) => { if (src === "sync") load(); listCategories().then(setCats); listRecipes().then(setAll); });
   }, [id, nav]);
   if (!r) return null;
 
@@ -48,11 +64,20 @@ export function RecipeDetail() {
   }
 
   const cover = coverOf(r);
+  // この料理の材料につながっているレシピ / このレシピを材料に使っている料理
+  const linked = r.ingredients
+    .map((i) => i.recipeId && all.find((x) => x.id === i.recipeId))
+    .filter((x): x is Recipe => !!x);
+  const usedIn = all.filter((x) => x.id !== r.id && x.ingredients.some((i) => i.recipeId === r.id));
 
   return (
     <div className="page detail">
       <header className="topbar">
-        <Link to="/" className="back">‹ 一覧</Link>
+        {from?.fromId ? (
+          <button className="link back" onClick={() => nav(-1)}>‹ {from.fromTitle}</button>
+        ) : (
+          <Link to="/" className="back">‹ 一覧</Link>
+        )}
         <h1 className="ellipsis">{r.title}</h1>
         <Link to={`/recipe/${r.id}/edit`} className="btn small">編集</Link>
       </header>
@@ -73,13 +98,32 @@ export function RecipeDetail() {
 
       <section className="panel">
         <h2>材料</h2>
-        <IngredientsPanel key={r.id} ingredients={r.ingredients} servings={r.servings} />
+        <IngredientsPanel key={`${r.id}:${startFactor}`} ingredients={r.ingredients} servings={r.servings}
+          initialFactor={startFactor} onFactorChange={setFactor}
+          note={inherited === 1 ? undefined : <>「{from?.fromTitle}」の分量に合わせて <b>×{Math.round(inherited * 100) / 100}</b> で計算しています。元の分量に戻すには「リセット」</>}
+          renderName={(ing) => {
+            const target = ing.recipeId && all.find((x) => x.id === ing.recipeId);
+            return target ? (
+              <Link to={`/recipe/${target.id}`} state={{ fromId: r.id, fromTitle: r.title, factor }} className="recipe-link">📖 {ing.name} ›</Link>
+            ) : ing.name;
+          }} />
       </section>
+
+      {usedIn.length > 0 && (
+        <section className="panel used-in">
+          <h2>このレシピを使う料理</h2>
+          <div className="cat-picker">
+            {usedIn.map((x) => (
+              <Link key={x.id} to={`/recipe/${x.id}`} state={{ fromId: r.id, fromTitle: r.title }} className="chip">📖 {x.title} ›</Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="panel">
         <h2>作り方</h2>
         {r.steps.length === 0 ? <p className="hint">未登録</p> : (
-          <ol className="steps">{r.steps.map((s, k) => <li key={k}><span className="num">{k + 1}</span><p>{s}</p></li>)}</ol>
+          <ol className="steps">{r.steps.map((s, k) => <li key={k}><span className="num">{k + 1}</span><p>{linkify(s, linked, r, factor)}</p></li>)}</ol>
         )}
       </section>
 
@@ -129,4 +173,18 @@ export function RecipeDetail() {
       <Lightbox id={view} onClose={() => setView(null)} />
     </div>
   );
+}
+
+/** 手順の文中に、つないだレシピの名前があれば押せるリンクにする */
+function linkify(text: string, linked: Recipe[], self: Recipe, factor: number) {
+  const names = [...new Set(linked.map((x) => x.title))].filter(Boolean).sort((a, b) => b.length - a.length);
+  if (!names.length) return text;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${names.map(esc).join("|")})`));
+  return parts.map((part, i) => {
+    const target = linked.find((x) => x.title === part);
+    return target ? (
+      <Link key={i} to={`/recipe/${target.id}`} state={{ fromId: self.id, fromTitle: self.title, factor }} className="recipe-link">{part}</Link>
+    ) : part;
+  });
 }
