@@ -7,6 +7,8 @@ import { ImagePicker } from "../components/ImagePicker";
 import { StoredImage } from "../components/StoredImage";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { RecipePicker } from "../components/RecipePicker";
+import { MARK_CHOICES } from "../../shared/textparse.mjs";
+import { markColor } from "../components/Mark";
 
 /** 保存済み(id) or 未保存(blob) の画像 */
 type Img = { id?: string; blob?: Blob; key: string };
@@ -98,7 +100,10 @@ export function RecipeEdit() {
         title: title.trim(),
         servings: servings.trim(),
         ingredients: ingredients
-          .map((i) => ({ name: i.name.trim(), amount: i.amount.trim(), ...(i.recipeId ? { recipeId: i.recipeId } : {}) }))
+          .map((i) => ({
+            name: i.name.trim(), amount: i.amount.trim(),
+            ...(i.mark ? { mark: i.mark } : {}), ...(i.recipeId ? { recipeId: i.recipeId } : {}),
+          }))
           .filter((i) => i.name),
         steps: steps.map((s) => s.trim()).filter(Boolean),
         sourceUrl: sourceUrl.trim(),
@@ -162,6 +167,12 @@ export function RecipeEdit() {
         {ingredients.map((ing, i) => (
           <div key={i} className="ing-edit">
             <div className="row">
+              <select className="input mark-select" value={ing.mark ?? ""} aria-label="印"
+                style={ing.mark ? { color: markColor(ing.mark), borderColor: markColor(ing.mark) } : undefined}
+                onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, mark: e.target.value || undefined } : x)))}>
+                <option value="">印</option>
+                {MARK_CHOICES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
               <input className="input grow" placeholder="材料" value={ing.name}
                 onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
               <input className="input amount" placeholder="分量" value={ing.amount}
@@ -176,7 +187,7 @@ export function RecipeEdit() {
             {ing.recipeId && (
               <div className="link-note">
                 📖 レシピ「{titles.get(ing.recipeId) ?? "（削除されたレシピ）"}」につながっています
-                <button type="button" className="link small" onClick={() => setIngredients((p) => p.map((x, j) => (j === i ? { name: x.name, amount: x.amount } : x)))}>はずす</button>
+                <button type="button" className="link small" onClick={() => setIngredients((p) => p.map((x, j) => (j === i ? { name: x.name, amount: x.amount, mark: x.mark } : x)))}>はずす</button>
               </div>
             )}
           </div>
@@ -185,7 +196,7 @@ export function RecipeEdit() {
           <button type="button" className="btn" onClick={() => setIngredients((p) => [...p, { name: "", amount: "" }])}>＋ 材料を追加</button>
           <button type="button" className="btn" onClick={() => setPicking("new")}>📖 別のレシピを材料に追加</button>
         </div>
-        <p className="hint small">ビビンバの「人参のナムル」のように、登録済みのレシピを材料として入れると、レシピの画面から押して移動できます。</p>
+        <p className="hint small">左の「印」で、調味料のまとまり（A・B・★など）を付けられます。作り方に「Aを加える」と書くと、印から中身を確認できます。<br />ビビンバの「人参のナムル」のように、登録済みのレシピを材料として入れると、レシピの画面から押して移動できます。</p>
         {picking !== null && (
           <RecipePicker excludeId={base?.id}
             initialQuery={typeof picking === "number" ? ingredients[picking]?.name ?? "" : ""}

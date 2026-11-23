@@ -156,3 +156,15 @@ button.back { background: none; border: 0; padding: 0; text-decoration: none; }
 .pick-list button { width: 100%; display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 8px; text-align: left; font-size: 15px; color: var(--text); }
 .pick-img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex: none; background: var(--accent-weak); display: grid; place-items: center; }
 .inherit-note { background: #fff1e6; color: #a2501f; border-radius: 10px; padding: 8px 10px; font-size: 13px; line-height: 1.5; }
+/* 材料の印（A・B・★など） */
+.mark-badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 6px; background: var(--mk); color: #fff;
+  font-size: 13px; font-weight: 700; line-height: 1; border: 0; vertical-align: 1px; margin: 0 2px; flex: none; }
+button.mark-badge { cursor: pointer; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--mk); }
+button.mark-badge.active { transform: scale(1.1); }
+.ingredients li.marked { border-left: 3px solid var(--mk); padding-left: 8px; background: color-mix(in srgb, var(--mk) 6%, transparent); }
+.ingredients li.marked .mark-badge { margin: 0 6px 0 0; }
+.mark-select { width: 58px; flex: none; padding: 8px 4px; font-weight: 700; text-align: center; }
+.step-body { flex: 1; }
+.step-body p { margin: 0; line-height: 1.8; }
+.mark-pop { margin-top: 6px; display: flex; gap: 8px; align-items: flex-start; background: color-mix(in srgb, var(--mk) 10%, #fff); border-left: 3px solid var(--mk);
+  border-radius: 8px; padding: 6px 10px; font-size: 14px; }

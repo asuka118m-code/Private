@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useNavigationType, useParams } from "re
 import { coverOf, deleteRecipe, getRecipe, listCategories, listRecipes, newId, onDataChange, putImage, saveRecipe, setSelectedCategory } from "../lib/db";
 import type { Category, Recipe } from "../lib/types";
 import { IngredientsPanel } from "../components/IngredientsPanel";
+import { MarkBadge, markColor } from "../components/Mark";
+import { scaleAmount } from "../lib/scale";
 import { StoredImage } from "../components/StoredImage";
 import { ImagePicker } from "../components/ImagePicker";
 import { Lightbox } from "../components/Lightbox";
@@ -123,7 +125,7 @@ export function RecipeDetail() {
       <section className="panel">
         <h2>作り方</h2>
         {r.steps.length === 0 ? <p className="hint">未登録</p> : (
-          <ol className="steps">{r.steps.map((s, k) => <li key={k}><span className="num">{k + 1}</span><p>{linkify(s, linked, r, factor)}</p></li>)}</ol>
+          <ol className="steps">{r.steps.map((s, k) => <li key={k}><span className="num">{k + 1}</span><StepText text={s} linked={linked} self={r} factor={factor} /></li>)}</ol>
         )}
       </section>
 
@@ -175,16 +177,45 @@ export function RecipeDetail() {
   );
 }
 
-/** 手順の文中に、つないだレシピの名前があれば押せるリンクにする */
-function linkify(text: string, linked: Recipe[], self: Recipe, factor: number) {
-  const names = [...new Set(linked.map((x) => x.title))].filter(Boolean).sort((a, b) => b.length - a.length);
-  if (!names.length) return text;
+/**
+ * 手順の1行。つないだレシピの名前は押せるリンクに、「A」「★」などの印は色付きの印にする。
+ * 印を押すと、その印の材料（今回の分量があればその量）が下に出る。
+ */
+function StepText({ text, linked, self, factor }: { text: string; linked: Recipe[]; self: Recipe; factor: number }) {
+  const [open, setOpen] = useState<string | null>(null);
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const parts = text.split(new RegExp(`(${names.map(esc).join("|")})`));
-  return parts.map((part, i) => {
-    const target = linked.find((x) => x.title === part);
-    return target ? (
-      <Link key={i} to={`/recipe/${target.id}`} state={{ fromId: self.id, fromTitle: self.title, factor }} className="recipe-link">{part}</Link>
-    ) : part;
-  });
+  const names = [...new Set(linked.map((x) => x.title))].filter(Boolean).sort((a, b) => b.length - a.length);
+  const marks = [...new Set(self.ingredients.map((i) => i.mark).filter((m): m is string => !!m))];
+  const full = (c: string) => String.fromCharCode(c.charCodeAt(0) + 0xfee0);
+  const markPatterns = marks.map((m) =>
+    /^[A-E]$/.test(m) ? `(?<![A-Za-zＡ-Ｚａ-ｚ])[${m}${full(m)}](?![A-Za-zＡ-Ｚａ-ｚ])` : esc(m));
+  const alts = [...names.map(esc), ...markPatterns];
+  const parts = alts.length ? text.split(new RegExp(`(${alts.join("|")})`)) : [text];
+  const toMark = (part: string) => {
+    const half = part.replace(/[Ａ-Ｅ]/, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+    return marks.includes(half) ? half : null;
+  };
+  const items = open ? self.ingredients.filter((i) => i.mark === open) : [];
+  return (
+    <div className="step-body">
+      <p>
+        {parts.map((part, i) => {
+          if (!part) return null;
+          const target = linked.find((x) => x.title === part);
+          if (target) {
+            return <Link key={i} to={`/recipe/${target.id}`} state={{ fromId: self.id, fromTitle: self.title, factor }} className="recipe-link">{part}</Link>;
+          }
+          const m = toMark(part);
+          if (m) return <MarkBadge key={i} mark={m} active={open === m} onClick={() => setOpen(open === m ? null : m)} />;
+          return part;
+        })}
+      </p>
+      {open && (
+        <div className="mark-pop" style={{ "--mk": markColor(open) } as React.CSSProperties}>
+          <MarkBadge mark={open} />
+          <span>{items.map((x) => `${x.name} ${factor !== 1 ? scaleAmount(x.amount, factor) : x.amount}`.trim()).join("、")}</span>
+        </div>
+      )}
+    </div>
+  );
 }
