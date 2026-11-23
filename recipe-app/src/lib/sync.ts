@@ -1,11 +1,11 @@
 // クラウド同期（端末内のデータを正として、変更分だけをやり取りする）
 // ルール：同じレシピを2台で変更した場合は「後から変更した方」が残る
-import { emitChange, getDb } from "./db";
-import type { Recipe } from "./types";
+import { CATEGORY_PREFIX, emitChange, getDb } from "./db";
+import type { Category, Recipe } from "./types";
 
 export interface RemoteRow {
   id: string;
-  data: Recipe | null;
+  data: Recipe | Category | null; // IDが "cat:" で始まる行はカテゴリ
   updated_at: number; // レシピの更新日時（端末の時計, ms）
   deleted: boolean;
   server_updated_at: string; // サーバー側で変更された時刻（取得位置の記録に使う）
@@ -56,8 +56,10 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
       await db.put("syncedImages", { id: imgId });
     }
   }
+  const changedCats = (await db.getAll("categories")).filter((c) => c.updatedAt > lastPushAt);
   const rows = [
     ...changed.map((r) => ({ id: r.id, data: r, updated_at: r.updatedAt, deleted: false })),
+    ...changedCats.map((c) => ({ id: CATEGORY_PREFIX + c.id, data: c, updated_at: c.updatedAt, deleted: false })),
     ...tombstones.map((t) => ({ id: t.id, data: null, updated_at: t.deletedAt, deleted: true })),
   ];
   if (rows.length) await remote.push(rows);
@@ -81,6 +83,15 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   let maxSeen = lastPull ?? null;
   for (const row of remoteRows) {
     if (!maxSeen || row.server_updated_at > maxSeen) maxSeen = row.server_updated_at;
+    if (row.id.startsWith(CATEGORY_PREFIX)) {
+      const id = row.id.slice(CATEGORY_PREFIX.length);
+      const cur = await db.get("categories", id);
+      if (cur && cur.updatedAt >= row.updated_at) continue;
+      if (row.deleted) { if (cur) { await db.delete("categories", id); pulled++; } continue; }
+      if (!cur && (await db.get("tombstones", row.id))) continue;
+      if (row.data) { await db.put("categories", { ...(row.data as Category), updatedAt: row.updated_at }); pulled++; }
+      continue;
+    }
     const local = await db.get("recipes", row.id);
     if (row.deleted) {
       if (local && local.updatedAt <= row.updated_at) {
@@ -97,7 +108,8 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
     }
     if (!row.data || (local && local.updatedAt >= row.updated_at)) continue;
     if (!local && (await db.get("tombstones", row.id))) continue; // この端末で削除済み
-    for (const imgId of [...row.data.sourceImageIds, ...row.data.photoIds]) {
+    const data = row.data as Recipe;
+    for (const imgId of [...data.sourceImageIds, ...data.photoIds]) {
       if (await db.get("images", imgId)) continue;
       const blob = await remote.downloadImage(imgId);
       if (blob) {
@@ -107,10 +119,10 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
     }
     // 不要になった画像を消す
     if (local) {
-      const keep = new Set([...row.data.sourceImageIds, ...row.data.photoIds]);
+      const keep = new Set([...data.sourceImageIds, ...data.photoIds]);
       for (const id of [...local.sourceImageIds, ...local.photoIds]) if (!keep.has(id)) await db.delete("images", id);
     }
-    await db.put("recipes", { ...row.data, updatedAt: row.updated_at });
+    await db.put("recipes", { ...data, updatedAt: row.updated_at });
     pulled++;
   }
   if (maxSeen) await setMeta("lastPull", maxSeen);

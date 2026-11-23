@@ -20,6 +20,7 @@ export interface Recipe {
   sourceImageIds: string[]; // 参考にしたスクショ・元画像
   photoIds: string[]; // 自分で作った料理の写真
   coverImageId?: string; // 一覧に表示する画像（未指定なら自動）
+  categoryIds?: string[]; // 入っているカテゴリ（複数可）
   memo: string;
   comments: Comment[];
   createdAt: number;
@@ -34,4 +35,13 @@ export interface RecipeDraft {
   steps: string[];
   sourceUrl: string;
   sourceImages: Blob[];
+  categoryIds?: string[];
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
 }
