@@ -1,6 +1,7 @@
 export interface Ingredient {
   name: string;
   amount: string;
+  recipeId?: string; // 別のレシピ（例：ビビンバの中の「人参のナムル」）につなぐ場合
 }
 
 export interface Comment {

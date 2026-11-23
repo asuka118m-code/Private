@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteImage, getRecipe, getSelectedCategory, listCategories, newId, putImage, saveRecipe } from "../lib/db";
+import { deleteImage, getRecipe, getSelectedCategory, listCategories, listRecipes, newId, putImage, saveRecipe } from "../lib/db";
 import { takeDraft } from "../lib/draft";
 import type { Ingredient, Recipe } from "../lib/types";
 import { ImagePicker } from "../components/ImagePicker";
 import { StoredImage } from "../components/StoredImage";
 import { CategoryPicker } from "../components/CategoryPicker";
+import { RecipePicker } from "../components/RecipePicker";
 
 /** 保存済み(id) or 未保存(blob) の画像 */
 type Img = { id?: string; blob?: Blob; key: string };
@@ -36,6 +37,10 @@ export function RecipeEdit() {
   const [photos, setPhotos] = useState<Img[]>([]);
   const [cover, setCover] = useState<string | undefined>(); // Img.key
   const [saving, setSaving] = useState(false);
+  const [titles, setTitles] = useState<Map<string, string>>(new Map()); // レシピID→名前（つないだレシピの表示用）
+  const [picking, setPicking] = useState<number | "new" | null>(null); // どの材料に別レシピをつなぐか
+
+  useEffect(() => { listRecipes().then((rs) => setTitles(new Map(rs.map((r) => [r.id, r.title])))); }, []);
 
   useEffect(() => {
     (async () => {
@@ -92,7 +97,9 @@ export function RecipeEdit() {
         id: base?.id ?? newId(),
         title: title.trim(),
         servings: servings.trim(),
-        ingredients: ingredients.map((i) => ({ name: i.name.trim(), amount: i.amount.trim() })).filter((i) => i.name),
+        ingredients: ingredients
+          .map((i) => ({ name: i.name.trim(), amount: i.amount.trim(), ...(i.recipeId ? { recipeId: i.recipeId } : {}) }))
+          .filter((i) => i.name),
         steps: steps.map((s) => s.trim()).filter(Boolean),
         sourceUrl: sourceUrl.trim(),
         memo,
@@ -153,19 +160,43 @@ export function RecipeEdit() {
       <section className="panel">
         <h2>材料</h2>
         {ingredients.map((ing, i) => (
-          <div key={i} className="row">
-            <input className="input grow" placeholder="材料" value={ing.name}
-              onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-            <input className="input amount" placeholder="分量" value={ing.amount}
-              onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
-            <div className="row-tools">
-              <button type="button" onClick={() => setIngredients((p) => move(p, i, -1))}>↑</button>
-              <button type="button" onClick={() => setIngredients((p) => move(p, i, 1))}>↓</button>
-              <button type="button" onClick={() => setIngredients((p) => p.filter((_, j) => j !== i))}>×</button>
+          <div key={i} className="ing-edit">
+            <div className="row">
+              <input className="input grow" placeholder="材料" value={ing.name}
+                onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
+              <input className="input amount" placeholder="分量" value={ing.amount}
+                onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+              <div className="row-tools">
+                <button type="button" className={ing.recipeId ? "linked" : ""} title="別のレシピにつなぐ" aria-label="別のレシピにつなぐ" onClick={() => setPicking(i)}>🔗</button>
+                <button type="button" onClick={() => setIngredients((p) => move(p, i, -1))}>↑</button>
+                <button type="button" onClick={() => setIngredients((p) => move(p, i, 1))}>↓</button>
+                <button type="button" onClick={() => setIngredients((p) => p.filter((_, j) => j !== i))}>×</button>
+              </div>
             </div>
+            {ing.recipeId && (
+              <div className="link-note">
+                📖 レシピ「{titles.get(ing.recipeId) ?? "（削除されたレシピ）"}」につながっています
+                <button type="button" className="link small" onClick={() => setIngredients((p) => p.map((x, j) => (j === i ? { name: x.name, amount: x.amount } : x)))}>はずす</button>
+              </div>
+            )}
           </div>
         ))}
-        <button type="button" className="btn" onClick={() => setIngredients((p) => [...p, { name: "", amount: "" }])}>＋ 材料を追加</button>
+        <div className="row wrap">
+          <button type="button" className="btn" onClick={() => setIngredients((p) => [...p, { name: "", amount: "" }])}>＋ 材料を追加</button>
+          <button type="button" className="btn" onClick={() => setPicking("new")}>📖 別のレシピを材料に追加</button>
+        </div>
+        <p className="hint small">ビビンバの「人参のナムル」のように、登録済みのレシピを材料として入れると、レシピの画面から押して移動できます。</p>
+        {picking !== null && (
+          <RecipePicker excludeId={base?.id}
+            initialQuery={typeof picking === "number" ? ingredients[picking]?.name ?? "" : ""}
+            onClose={() => setPicking(null)}
+            onPick={(r) => {
+              setTitles((m) => new Map(m).set(r.id, r.title));
+              if (picking === "new") setIngredients((p) => [...p.filter((x) => x.name || x.amount), { name: r.title, amount: "", recipeId: r.id }]);
+              else setIngredients((p) => p.map((x, j) => (j === picking ? { ...x, name: x.name || r.title, recipeId: r.id } : x)));
+              setPicking(null);
+            }} />
+        )}
       </section>
 
       <section className="panel">

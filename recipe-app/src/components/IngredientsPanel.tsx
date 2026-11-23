@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Ingredient } from "../lib/types";
 import { firstNumber, formatNumber, isScalable, normalize, scaleAmount } from "../lib/scale";
 
@@ -7,7 +7,9 @@ import { firstNumber, formatNumber, isScalable, normalize, scaleAmount } from ".
  * 登録した分量は一切変えず、右側の「今回」欄に計算結果を出す。
  * 人数欄または好きな材料の「今回」欄に数字を入れると、全体がその比率で計算される。
  */
-export function IngredientsPanel({ ingredients, servings }: { ingredients: Ingredient[]; servings: string }) {
+export function IngredientsPanel({ ingredients, servings, renderName }: {
+  ingredients: Ingredient[]; servings: string; renderName?: (ing: Ingredient) => ReactNode;
+}) {
   const [factor, setFactor] = useState(1);
   const [editing, setEditing] = useState<string | null>(null); // "servings" | 材料の番号
   const [text, setText] = useState("");
@@ -59,7 +61,7 @@ export function IngredientsPanel({ ingredients, servings }: { ingredients: Ingre
           const key = String(k);
           return (
             <li key={k}>
-              <span className="name">{ing.name}</span>
+              <span className="name">{renderName ? renderName(ing) : ing.name}</span>
               <span className="dots" />
               <span className="amount">{ing.amount}</span>
               {canScale && (base !== null ? (
