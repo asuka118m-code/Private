@@ -95,3 +95,38 @@ describe("parseRecipesText（一括登録）", () => {
     expect(parseRecipesText("カレー\n材料\n玉ねぎ 1個\n作り方\n1. 炒める")).toHaveLength(1);
   });
 });
+
+describe("材料の印（A・B・★など）", () => {
+  it.each([
+    ["A 醤油 大さじ2", { mark: "A", name: "醤油", amount: "大さじ2" }],
+    ["(A)みりん 大さじ1", { mark: "A", name: "みりん", amount: "大さじ1" }],
+    ["【B】酢 大さじ1", { mark: "B", name: "酢", amount: "大さじ1" }],
+    ["Ａ砂糖 小さじ1", { mark: "A", name: "砂糖", amount: "小さじ1" }],
+    ["★片栗粉 小さじ1", { mark: "★", name: "片栗粉", amount: "小さじ1" }],
+    ["・塩 少々", { name: "塩", amount: "少々" }],
+    ["Lサイズの卵 2個", { name: "Lサイズの卵", amount: "2個" }],
+  ])("%s", (line, want) => expect(splitIngredient(line)).toEqual(want));
+
+  it("見出しでまとめた書き方・箇条書きの●は印にしない", () => {
+    const r = parseRecipeText(`照り焼き
+材料
+鶏もも肉 1枚
+A（合わせ調味料）
+醤油 大さじ2
+みりん 大さじ2
+
+サラダ油 小さじ1
+★片栗粉 小さじ1
+作り方
+1. Aを混ぜておく`);
+    expect(r.ingredients).toEqual([
+      { name: "鶏もも肉", amount: "1枚" },
+      { name: "醤油", amount: "大さじ2", mark: "A" },
+      { name: "みりん", amount: "大さじ2", mark: "A" },
+      { name: "サラダ油", amount: "小さじ1" },
+      { name: "片栗粉", amount: "小さじ1", mark: "★" },
+    ]);
+    const b = parseRecipeText("サラダ\n材料\n●レタス 1/2玉\n●トマト 1個\n作り方\n1. 切る");
+    expect(b.ingredients).toEqual([{ name: "レタス", amount: "1/2玉" }, { name: "トマト", amount: "1個" }]);
+  });
+});

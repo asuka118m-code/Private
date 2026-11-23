@@ -82,7 +82,7 @@ export function ImportPage() {
       categoryIds,
       title: r.title || "",
       servings: r.servings || "",
-      ingredients: r.ingredients ?? [],
+      ingredients: (r.ingredients ?? []).map((i) => (i.mark ? i : { name: i.name, amount: i.amount })),
       steps: r.steps ?? [],
       sourceUrl,
       sourceImages: imgs,

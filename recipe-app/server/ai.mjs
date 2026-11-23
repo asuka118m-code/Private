@@ -13,8 +13,9 @@ const RECIPE = {
         properties: {
           name: { type: "string", description: "材料名のみ" },
           amount: { type: "string", description: "分量。記載がなければ空文字" },
+          mark: { type: "string", description: "A・B・★などの印。無ければ空文字" },
         },
-        required: ["name", "amount"],
+        required: ["name", "amount", "mark"],
         additionalProperties: false,
       },
     },
@@ -33,7 +34,7 @@ const SCHEMA = {
 
 const SYSTEM = `あなたは料理レシピの整理係です。与えられた画像やテキストからレシピを読み取り、JSONで返します。
 - 材料は1つずつ分け、分量は amount に入れる（「大さじ1」「200g」「少々」など原文どおり）。
-- 調味料のまとまり（A、合わせ調味料など）は名前に「(A) 醤油」のように付記する。
+- 調味料のまとまりを表す印（A、B、★、◎など）は mark に入れ、name には含めない。印が無ければ空文字。
 - 手順は作る順に1ステップずつ。番号や「STEP」は付けない。
 - 書かれていない材料や手順を創作しない。レシピが読み取れない場合は空配列にする。
 - 複数のレシピが含まれていれば、それぞれ別のレシピとして recipes に入れる。

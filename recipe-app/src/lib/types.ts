@@ -1,6 +1,7 @@
 export interface Ingredient {
   name: string;
   amount: string;
+  mark?: string; // 「A」「★」など、調味料のまとまりを表す印
   recipeId?: string; // 別のレシピ（例：ビビンバの中の「人参のナムル」）につなぐ場合
 }
 

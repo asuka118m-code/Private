@@ -1,9 +1,37 @@
 // テキストからのレシピ解析（AI不要・ブラウザとサーバーの両方で使う）
 
-/** 材料の1行を「名前」と「分量」に分ける。例: "玉ねぎ 1/2個" → {name:"玉ねぎ", amount:"1/2個"} */
+/** 材料に付ける印（調味料のまとまりなど）として使える記号 */
+export const MARK_CHOICES = ["A", "B", "C", "D", "E", "★", "☆", "◎", "○", "●", "◆", "◇", "■", "□", "※", "♪"];
+const MARK_SYMBOLS = "★☆◎○◯●◆◇■□※♪";
+const toHalf = (c) => c.replace(/[Ａ-Ｅａ-ｅ]/g, (x) => String.fromCharCode(x.charCodeAt(0) - 0xfee0)).toUpperCase().replace("◯", "○");
+const GROUP_WORDS = "(?:合わせ調味料|調味料|たれ|タレ|ソース|下味|ドレッシング|衣|トッピング)";
+
+/**
+ * 行の先頭の印を取り出す。「A 醤油」「(A)醤油」「【A】醤油」「A.醤油」「★醤油」→ {mark:"A"/"★", rest:"醤油"}
+ * 「A」「【A】」「A（合わせ調味料）」だけの行は見出し（rest が空）
+ */
+export function takeMark(line) {
+  const s = String(line).trim();
+  let m = s.match(new RegExp(`^[（(【\\[<＜〈]\\s*([A-EＡ-Ｅa-eａ-ｅ]|[${MARK_SYMBOLS}])\\s*[）)】\\]>＞〉]\\s*(.*)$`));
+  if (!m) m = s.match(/^([A-EＡ-Ｅ])(?:\s+|[.．:：]\s*|(?=[ぁ-んァ-ヶ一-龠々（(【<＜])|$)(.*)$/);
+  if (!m) m = s.match(new RegExp(`^([${MARK_SYMBOLS}])\\s*(.*)$`));
+  if (!m) return { mark: "", rest: s };
+  let rest = m[2].trim();
+  if (new RegExp(`^[（(【<＜]?${GROUP_WORDS}[）)】>＞]?$`).test(rest)) rest = ""; // 「A（合わせ調味料）」は見出し
+  return { mark: toHalf(m[1]), rest };
+}
+
+/** 材料の1行を「名前」と「分量」（と印）に分ける。例: "玉ねぎ 1/2個" → {name:"玉ねぎ", amount:"1/2個"} */
 export function splitIngredient(line) {
   let s = String(line).replace(/\s+/g, " ").trim();
-  s = s.replace(/^[・\-\*●○◯■□◆◇★☆✓✔︎•·]+\s*/, "");
+  s = s.replace(/^[・\-\*✓✔︎•·]+\s*/, "");
+  const { mark, rest } = takeMark(s);
+  if (mark && !rest) return null; // 見出しだけの行
+  const ing = splitIngredientBody(rest);
+  return ing && mark ? { ...ing, mark } : ing;
+}
+
+function splitIngredientBody(s) {
   if (!s) return null;
   // 区切り記号（… ‥ ： : … 全角スペース 等）
   const sep = s.match(/^(.+?)\s*(?:…+|‥+|・{2,}|\.{3,}|：|:|\t| {2,}|　)\s*(.+)$/);
@@ -74,14 +102,15 @@ export function parseRecipesText(text) {
 export function parseRecipeText(text) {
   const lines = String(text)
     .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
+    .map((l) => l.trim());
   let title = "";
   let servings = "";
   const ingredients = [];
   const steps = [];
   let mode = "none";
+  let groupMark = "";
   for (const line of lines) {
+    if (!line && mode !== "ing") continue;
     const t = line.match(TITLE_HEAD);
     if (t) { if (!title) title = t[2].trim(); continue; }
     if (ingHead.test(line)) {
@@ -101,13 +130,21 @@ export function parseRecipeText(text) {
       if (/^(?:[0-9０-９]+[.．、)）]|[①-⑳])/.test(line) && !/[個本枚gml]$/.test(line)) {
         mode = "step"; steps.push(stripStepNumber(line)); continue;
       }
+      if (!line) { groupMark = ""; continue; } // 空行で「A」などのまとまりが終わる
+      const head = takeMark(line.replace(/^[・\-\*•·]+\s*/, ""));
+      if (head.mark && !head.rest) { groupMark = head.mark; continue; } // 「【A】」「A（合わせ調味料）」の見出し行
       const ing = splitIngredient(line);
-      if (ing) ingredients.push(ing);
+      if (ing) ingredients.push(!ing.mark && groupMark ? { ...ing, mark: groupMark } : ing);
     } else if (mode === "step") {
       const isNumbered = /^(?:STEP\s*)?(?:[0-9０-９]+[.．、)）:：]?|[①-⑳])/i.test(line);
       if (!isNumbered && steps.length) steps[steps.length - 1] += line; // 折り返し行は前の手順へ
       else steps.push(stripStepNumber(line));
     }
+  }
+  // 全部の材料の頭に同じ記号（●など）が付いているのは、印ではなくただの箇条書き
+  const symbolMarks = ingredients.map((i) => i.mark).filter((m) => m && !/^[A-E]$/.test(m));
+  if (ingredients.length >= 2 && symbolMarks.length === ingredients.length && new Set(symbolMarks).size === 1) {
+    for (const i of ingredients) delete i.mark;
   }
   return { title, servings, ingredients, steps: steps.filter(Boolean) };
 }

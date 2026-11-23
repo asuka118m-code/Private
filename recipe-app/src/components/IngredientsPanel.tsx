@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { Ingredient } from "../lib/types";
 import { firstNumber, formatNumber, isScalable, normalize, scaleAmount } from "../lib/scale";
+import { MarkBadge, markColor } from "./Mark";
 
 /**
  * 材料の表示＋「今回の分量」計算。
@@ -66,7 +67,8 @@ export function IngredientsPanel({ ingredients, servings, renderName, initialFac
           const base = firstNumber(ing.amount);
           const key = String(k);
           return (
-            <li key={k}>
+            <li key={k} className={ing.mark ? "marked" : ""} style={ing.mark ? ({ "--mk": markColor(ing.mark) } as React.CSSProperties) : undefined}>
+              {ing.mark && <MarkBadge mark={ing.mark} />}
               <span className="name">{renderName ? renderName(ing) : ing.name}</span>
               <span className="dots" />
               <span className="amount">{ing.amount}</span>
