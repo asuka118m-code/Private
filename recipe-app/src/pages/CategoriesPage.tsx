@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { addCategory, deleteCategory, listCategories, listRecipes, onDataChange, saveCategory } from "../lib/db";
 import type { Category, Recipe } from "../lib/types";
 
@@ -7,6 +7,7 @@ export function CategoriesPage() {
   const [cats, setCats] = useState<Category[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [name, setName] = useState("");
+  const nav = useNavigate();
   useEffect(() => {
     const load = () => { listCategories().then(setCats); listRecipes().then(setRecipes); };
     load();
@@ -20,7 +21,9 @@ export function CategoriesPage() {
     if (!n) return;
     if (cats.some((c) => c.name === n)) return alert("同じ名前のカテゴリがあります");
     setName("");
-    await addCategory(n);
+    const c = await addCategory(n);
+    // 作ったら続けてレシピを選べるようにする
+    if (recipes.length && confirm(`「${n}」を作りました。続けてレシピを選びますか？`)) nav(`/categories/${c.id}/select`);
   }
 
   async function rename(c: Category, value: string) {
@@ -66,7 +69,7 @@ export function CategoriesPage() {
           <div key={c.id} className="row">
             <input className="input grow" defaultValue={c.name} key={c.name} onBlur={(e) => rename(c, e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
-            <span className="hint small nowrap">{count(c.id)}件</span>
+            <Link to={`/categories/${c.id}/select`} className="btn small nowrap">レシピを選ぶ（{count(c.id)}件）</Link>
             <div className="row-tools">
               <button type="button" onClick={() => move(i, -1)} aria-label="上へ">↑</button>
               <button type="button" onClick={() => move(i, 1)} aria-label="下へ">↓</button>
@@ -74,7 +77,7 @@ export function CategoriesPage() {
             </div>
           </div>
         ))}
-        <p className="hint small">名前はタップして直接書き換えられます。レシピをカテゴリに入れるには、レシピの「編集」で選びます。</p>
+        <p className="hint small">名前はタップして直接書き換えられます。「レシピを選ぶ」から、全レシピの中から複数選んでまとめて入れられます。</p>
       </section>
     </div>
   );

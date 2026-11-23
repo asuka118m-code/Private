@@ -7,6 +7,7 @@ import { RecipeEdit } from "./pages/RecipeEdit";
 import { ImportPage } from "./pages/ImportPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
+import { CategorySelectPage } from "./pages/CategorySelectPage";
 import "./styles.css";
 import { initSync } from "./lib/useSync";
 
@@ -26,6 +27,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/share" element={<ImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/categories/:id/select" element={<CategorySelectPage />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>
