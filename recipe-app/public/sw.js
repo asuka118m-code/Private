@@ -1,7 +1,15 @@
 // オフライン用キャッシュ + SNSからの「共有」受け取り
-const CACHE = "recipe-app-v1";
+const CACHE = "recipe-app-v2";
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (e) =>
+  e.waitUntil(
+    (async () => {
+      // 古い版のキャッシュ（古いアイコンなど）を消す
+      for (const k of await caches.keys()) if (k !== CACHE && k !== "share-inbox") await caches.delete(k);
+      await self.clients.claim();
+    })()
+  )
+);
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
