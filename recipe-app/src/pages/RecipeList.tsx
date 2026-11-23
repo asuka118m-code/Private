@@ -50,10 +50,13 @@ export function RecipeList() {
         ))}
         <Link to="/categories" className="chip ghost">{categories.length ? "✎ カテゴリ編集" : "＋ カテゴリを作る"}</Link>
       </nav>
+      {current && (
+        <Link to={`/categories/${current}/select`} className="btn wide add-to-cat">＋ レシピを選んで「{categories.find((c) => c.id === current)?.name}」に追加</Link>
+      )}
       {shown && shown.length === 0 && (
         <div className="empty">
           {q.trim() ? "見つかりませんでした" :
-            current ? (<>このカテゴリにはまだレシピがありません。<br />レシピの「編集」からカテゴリを選べます。</>) :
+            current ? (<>このカテゴリにはまだレシピがありません。<br />上の「＋ レシピを選んで追加」から入れられます。</>) :
             (<>まだレシピがありません。<br />右下の「＋」から追加しましょう。</>)}
         </div>
       )}
