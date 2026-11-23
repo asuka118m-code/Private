@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { deleteImage, getRecipe, newId, putImage, saveRecipe } from "../lib/db";
+import { deleteImage, getRecipe, getSelectedCategory, listCategories, newId, putImage, saveRecipe } from "../lib/db";
 import { takeDraft } from "../lib/draft";
 import type { Ingredient, Recipe } from "../lib/types";
 import { ImagePicker } from "../components/ImagePicker";
 import { StoredImage } from "../components/StoredImage";
+import { CategoryPicker } from "../components/CategoryPicker";
 
 /** 保存済み(id) or 未保存(blob) の画像 */
 type Img = { id?: string; blob?: Blob; key: string };
@@ -30,6 +31,7 @@ export function RecipeEdit() {
   const [steps, setSteps] = useState<string[]>([""]);
   const [sourceUrl, setSourceUrl] = useState("");
   const [memo, setMemo] = useState("");
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [sourceImgs, setSourceImgs] = useState<Img[]>([]);
   const [photos, setPhotos] = useState<Img[]>([]);
   const [cover, setCover] = useState<string | undefined>(); // Img.key
@@ -50,8 +52,13 @@ export function RecipeEdit() {
         setSourceImgs(r.sourceImageIds.map(toImg));
         setPhotos(r.photoIds.map(toImg));
         setCover(r.coverImageId);
+        setCategoryIds(r.categoryIds ?? []);
       } else {
         const d = takeDraft();
+        // 一覧でカテゴリを選んでいたら、新しいレシピはそのカテゴリに入れておく
+        const sel = getSelectedCategory();
+        if (d?.categoryIds) setCategoryIds(d.categoryIds);
+        else if (sel && (await listCategories()).some((c) => c.id === sel)) setCategoryIds([sel]);
         if (d) {
           setTitle(d.title);
           setServings(d.servings);
@@ -92,6 +99,7 @@ export function RecipeEdit() {
         sourceImageIds: src.map((x) => x.id),
         photoIds: ph.map((x) => x.id),
         coverImageId: coverId,
+        categoryIds,
         comments: base?.comments ?? [],
         createdAt: base?.createdAt ?? now,
         updatedAt: now,
@@ -133,7 +141,13 @@ export function RecipeEdit() {
 
       <section className="panel">
         <label className="field">タイトル<input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：豚バラ大根" /></label>
-        <label className="field">分量（何人分）<input className="input" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="例：2人分" /></label>
+        <label className="field">分量（何人分・何個分）<input className="input" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="例：2人分、12個分" /></label>
+      </section>
+
+      <section className="panel">
+        <h2>カテゴリ</h2>
+        <CategoryPicker value={categoryIds} onChange={setCategoryIds} />
+        <p className="hint small">複数選べます。どれも選ばなくても「すべて」には表示されます。</p>
       </section>
 
       <section className="panel">

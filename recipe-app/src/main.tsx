@@ -6,6 +6,7 @@ import { RecipeDetail } from "./pages/RecipeDetail";
 import { RecipeEdit } from "./pages/RecipeEdit";
 import { ImportPage } from "./pages/ImportPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { CategoriesPage } from "./pages/CategoriesPage";
 import "./styles.css";
 import { initSync } from "./lib/useSync";
 
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/recipe/:id/edit" element={<RecipeEdit />} />
         <Route path="/share" element={<ImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

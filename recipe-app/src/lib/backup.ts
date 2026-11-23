@@ -1,11 +1,12 @@
 import { getAllData, mergeData } from "./db";
-import type { Recipe } from "./types";
+import type { Category, Recipe } from "./types";
 
 interface BackupFile {
   app: "recipe-app";
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   recipes: Recipe[];
+  categories?: Category[];
   images: { id: string; type: string; data: string }[]; // base64
 }
 
@@ -26,9 +27,9 @@ const fromBase64 = (data: string, type: string) => {
 
 /** 全レシピと画像を1つのファイルにして保存（iPhone/iPadは「ファイル」アプリやiCloud Driveに保存可） */
 export async function exportBackup() {
-  const { recipes, images } = await getAllData();
+  const { recipes, images, categories } = await getAllData();
   const file: BackupFile = {
-    app: "recipe-app", version: 1, exportedAt: new Date().toISOString(), recipes,
+    app: "recipe-app", version: 2, exportedAt: new Date().toISOString(), recipes, categories,
     images: await Promise.all(images.map(async (i) => ({ id: i.id, type: i.blob.type, data: await toBase64(i.blob) }))),
   };
   const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
@@ -51,5 +52,5 @@ export async function exportBackup() {
 export async function importBackup(file: File) {
   const data = JSON.parse(await file.text()) as BackupFile;
   if (data.app !== "recipe-app" || !Array.isArray(data.recipes)) throw new Error("このアプリのバックアップファイルではありません");
-  return mergeData(data.recipes, data.images.map((i) => ({ id: i.id, blob: fromBase64(i.data, i.type) })));
+  return mergeData(data.recipes, data.images.map((i) => ({ id: i.id, blob: fromBase64(i.data, i.type) })), data.categories ?? []);
 }

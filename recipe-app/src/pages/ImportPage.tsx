@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { aiStatus, fetchRemoteImage, findUrl, importFromImages, importFromText, importFromUrl, type ImportResult } from "../lib/api";
 import { setDraft } from "../lib/draft";
-import { saveDraftAsRecipe } from "../lib/db";
+import { getSelectedCategory, listCategories, saveDraftAsRecipe } from "../lib/db";
 import type { RecipeDraft } from "../lib/types";
 import { ImagePicker } from "../components/ImagePicker";
 import { StoredImage } from "../components/StoredImage";
@@ -76,7 +76,10 @@ export function ImportPage() {
       const b = await fetchRemoteImage(result.imageUrl);
       if (b) imgs.unshift(b);
     }
+    const sel = getSelectedCategory();
+    const categoryIds = sel && (await listCategories()).some((c) => c.id === sel) ? [sel] : [];
     const drafts: RecipeDraft[] = result.recipes.map((r) => ({
+      categoryIds,
       title: r.title || "",
       servings: r.servings || "",
       ingredients: r.ingredients ?? [],

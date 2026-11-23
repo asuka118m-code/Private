@@ -1,23 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { coverOf, listRecipes, onDataChange } from "../lib/db";
+import { coverOf, getSelectedCategory, listCategories, listRecipes, onDataChange, setSelectedCategory } from "../lib/db";
 import { useSyncState } from "../lib/useSync";
-import type { Recipe } from "../lib/types";
+import type { Category, Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 
 export function RecipeList() {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selected, setSelected] = useState(getSelectedCategory);
   const [q, setQ] = useState("");
   const sync = useSyncState();
   useEffect(() => {
-    listRecipes().then(setRecipes);
-    return onDataChange(() => listRecipes().then(setRecipes));
+    const load = () => { listRecipes().then(setRecipes); listCategories().then(setCategories); };
+    load();
+    return onDataChange(load);
   }, []);
+  // 選んでいたカテゴリが消えていたら「すべて」に戻す
+  const current = categories.some((c) => c.id === selected) ? selected : "";
+  const select = (id: string) => { setSelected(id); setSelectedCategory(id); };
+
+  const count = (id: string) => recipes?.filter((r) => r.categoryIds?.includes(id)).length ?? 0;
   const shown = useMemo(() => {
+    let list = recipes;
+    if (list && current) list = list.filter((r) => r.categoryIds?.includes(current));
     const k = q.trim();
-    if (!recipes || !k) return recipes;
-    return recipes.filter((r) => r.title.includes(k) || r.ingredients.some((i) => i.name.includes(k)));
-  }, [recipes, q]);
+    if (!list || !k) return list;
+    return list.filter((r) => r.title.includes(k) || r.ingredients.some((i) => i.name.includes(k)));
+  }, [recipes, q, current]);
 
   return (
     <div className="page">
@@ -31,9 +41,20 @@ export function RecipeList() {
         <Link to="/settings" className="notice">ログインすると、iPhone・iPadなど複数の端末でレシピが同期されます ›</Link>
       )}
       <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
+      <nav className="cat-bar">
+        <button className={`chip ${current === "" ? "on" : ""}`} onClick={() => select("")}>すべて <span>{recipes?.length ?? 0}</span></button>
+        {categories.map((c) => (
+          <button key={c.id} className={`chip ${current === c.id ? "on" : ""}`} onClick={() => select(c.id)}>
+            {c.name} <span>{count(c.id)}</span>
+          </button>
+        ))}
+        <Link to="/categories" className="chip ghost">{categories.length ? "✎ カテゴリ編集" : "＋ カテゴリを作る"}</Link>
+      </nav>
       {shown && shown.length === 0 && (
         <div className="empty">
-          {recipes?.length ? "見つかりませんでした" : (<>まだレシピがありません。<br />右下の「＋」から追加しましょう。</>)}
+          {q.trim() ? "見つかりませんでした" :
+            current ? (<>このカテゴリにはまだレシピがありません。<br />レシピの「編集」からカテゴリを選べます。</>) :
+            (<>まだレシピがありません。<br />右下の「＋」から追加しましょう。</>)}
         </div>
       )}
       <ul className="recipe-grid">

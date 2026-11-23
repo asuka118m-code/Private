@@ -1,6 +1,8 @@
 // 2台の端末（別々のIndexedDB）＋ 疑似クラウドで同期の動きを確認する
 import { describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
+const mem = new Map<string, string>();
+(globalThis as any).localStorage ??= { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => mem.set(k, v) };
 import { IDBFactory } from "fake-indexeddb";
 import type { Remote, RemoteRow } from "../src/lib/sync";
 import type { Recipe } from "../src/lib/types";
@@ -106,5 +108,34 @@ describe("クラウド同期", () => {
     expect(cloud.rows.get("r2")?.data?.title).toBe("スープ");
     // 変更がなければ何も送らない
     expect((await a.sync.syncOnce(cloud.remote)).pushed).toBe(0);
+  });
+});
+
+describe("カテゴリの同期", () => {
+  it("作成・名前変更・削除が他の端末に届き、レシピのカテゴリも同期される", async () => {
+    const cloud = fakeCloud();
+    const a = await device();
+    const cat = await a.db.addCategory("主菜");
+    await a.db.saveRecipe(recipe("r1", "生姜焼き", { categoryIds: [cat.id] }));
+    await a.sync.syncOnce(cloud.remote);
+    expect(cloud.rows.has("cat:" + cat.id)).toBe(true);
+
+    const b = await device();
+    await b.sync.syncOnce(cloud.remote);
+    expect((await b.db.listCategories()).map((c) => c.name)).toEqual(["主菜"]);
+    expect(await b.db.listRecipes()).toHaveLength(1); // カテゴリはレシピとして混ざらない
+    expect((await b.db.getRecipe("r1"))?.categoryIds).toEqual([cat.id]);
+
+    await new Promise((r) => setTimeout(r, 5));
+    await b.db.saveCategory({ ...(await b.db.listCategories())[0], name: "メイン" });
+    await b.sync.syncOnce(cloud.remote);
+    await a.sync.syncOnce(cloud.remote);
+    expect((await a.db.listCategories())[0].name).toBe("メイン");
+
+    await a.db.deleteCategory(cat.id);
+    await a.sync.syncOnce(cloud.remote);
+    await b.sync.syncOnce(cloud.remote);
+    expect(await b.db.listCategories()).toEqual([]);
+    expect(await b.db.getRecipe("r1")).toBeDefined(); // 中のレシピは消えない
   });
 });

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { coverOf, deleteRecipe, getRecipe, newId, onDataChange, putImage, saveRecipe } from "../lib/db";
-import type { Recipe } from "../lib/types";
+import { coverOf, deleteRecipe, getRecipe, listCategories, newId, onDataChange, putImage, saveRecipe, setSelectedCategory } from "../lib/db";
+import type { Category, Recipe } from "../lib/types";
+import { IngredientsPanel } from "../components/IngredientsPanel";
 import { StoredImage } from "../components/StoredImage";
 import { ImagePicker } from "../components/ImagePicker";
 import { Lightbox } from "../components/Lightbox";
@@ -15,12 +16,14 @@ export function RecipeDetail() {
   const [view, setView] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
+  const [cats, setCats] = useState<Category[]>([]);
 
   useEffect(() => {
     if (!id) return;
     const load = () => getRecipe(id).then((x) => (x ? setR(x) : nav("/")));
     load();
-    return onDataChange((src) => src === "sync" && load());
+    listCategories().then(setCats);
+    return onDataChange((src) => { if (src === "sync") load(); listCategories().then(setCats); });
   }, [id, nav]);
   if (!r) return null;
 
@@ -57,16 +60,20 @@ export function RecipeDetail() {
       {cover && <StoredImage id={cover} className="hero" onClick={() => setView(cover)} />}
       <h1 className="recipe-title">{r.title}</h1>
       {r.servings && <div className="servings">{r.servings}</div>}
+      {(() => {
+        const mine = cats.filter((c) => r.categoryIds?.includes(c.id));
+        return mine.length > 0 && (
+          <div className="cat-picker detail-cats">
+            {mine.map((c) => (
+              <button key={c.id} className="chip" onClick={() => { setSelectedCategory(c.id); nav("/"); }}>{c.name}</button>
+            ))}
+          </div>
+        );
+      })()}
 
       <section className="panel">
         <h2>材料</h2>
-        {r.ingredients.length === 0 ? <p className="hint">未登録</p> : (
-          <ul className="ingredients">
-            {r.ingredients.map((i, k) => (
-              <li key={k}><span className="name">{i.name}</span><span className="dots" /><span className="amount">{i.amount}</span></li>
-            ))}
-          </ul>
-        )}
+        <IngredientsPanel key={r.id} ingredients={r.ingredients} servings={r.servings} />
       </section>
 
       <section className="panel">
