@@ -5,6 +5,10 @@ import type { Category, Recipe } from "../lib/types";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { MarkBadge, markColor } from "../components/Mark";
 import { scaleAmount } from "../lib/scale";
+import { ShareDialog } from "../components/ShareDialog";
+import { CommentList } from "../components/CommentList";
+import { deleteSharedComment, fetchSharedComments, getOwnerName } from "../lib/share";
+import type { Comment } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 import { ImagePicker } from "../components/ImagePicker";
 import { Lightbox } from "../components/Lightbox";
@@ -20,6 +24,17 @@ export function RecipeDetail() {
   const [rating, setRating] = useState(0);
   const [cats, setCats] = useState<Category[]>([]);
   const [all, setAll] = useState<Recipe[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const [guestComments, setGuestComments] = useState<Comment[]>([]);
+  useEffect(() => {
+    if (!id) return;
+    const load = () => fetchSharedComments(id).then(setGuestComments);
+    load();
+    // アプリに戻ってきた時に新しいコメントを取り直す
+    const onVisible = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [id, sharing]);
   const location = useLocation();
   const from = (location.state as { fromId?: string; fromTitle?: string; factor?: number } | null) ?? null;
   const inherited = from?.factor && from.factor !== 1 ? from.factor : 1;
@@ -81,6 +96,7 @@ export function RecipeDetail() {
           <Link to="/" className="back">‹ 一覧</Link>
         )}
         <h1 className="ellipsis">{r.title}</h1>
+        <button className="btn small" onClick={() => setSharing(true)}>共有</button>
         <Link to={`/recipe/${r.id}/edit`} className="btn small">編集</Link>
       </header>
 
@@ -149,18 +165,12 @@ export function RecipeDetail() {
             placeholder="例：少し甘かったので次はみりんを減らす" />
           <button className="btn primary" disabled={!comment.trim()} onClick={addComment}>コメントを残す</button>
         </div>
-        <ul className="comments">
-          {r.comments.map((c) => (
-            <li key={c.id}>
-              <div className="c-head">
-                <span>{fmtDate(c.createdAt)}</span>
-                {c.rating && <span className="stars">{"★".repeat(c.rating)}</span>}
-                <button className="link small" onClick={() => confirm("このコメントを削除しますか？") && update({ comments: r.comments.filter((x) => x.id !== c.id) })}>削除</button>
-              </div>
-              <p className="pre">{c.text}</p>
-            </li>
-          ))}
-        </ul>
+        <CommentList comments={[...r.comments, ...guestComments]} selfLabel={getOwnerName() || "わたし"}
+          onDelete={async (c) => {
+            if (!confirm(c.shared ? `${c.author}さんのコメントを削除しますか？` : "このコメントを削除しますか？")) return;
+            if (c.shared) { await deleteSharedComment(c.id); setGuestComments((g) => g.filter((x) => x.id !== c.id)); }
+            else await update({ comments: r.comments.filter((x) => x.id !== c.id) });
+          }} />
       </section>
 
       {(r.sourceUrl || r.sourceImageIds.length > 0) && (
@@ -173,6 +183,7 @@ export function RecipeDetail() {
 
       <div className="center"><button className="link danger" onClick={remove}>このレシピを削除</button></div>
       <Lightbox id={view} onClose={() => setView(null)} />
+      {sharing && <ShareDialog recipeId={r.id} title={r.title} onClose={() => setSharing(false)} />}
     </div>
   );
 }
@@ -181,7 +192,7 @@ export function RecipeDetail() {
  * 手順の1行。つないだレシピの名前は押せるリンクに、「A」「★」などの印は色付きの印にする。
  * 印を押すと、その印の材料（今回の分量があればその量）が下に出る。
  */
-function StepText({ text, linked, self, factor }: { text: string; linked: Recipe[]; self: Recipe; factor: number }) {
+export function StepText({ text, linked, self, factor }: { text: string; linked: Recipe[]; self: Recipe; factor: number }) {
   const [open, setOpen] = useState<string | null>(null);
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const names = [...new Set(linked.map((x) => x.title))].filter(Boolean).sort((a, b) => b.length - a.length);
