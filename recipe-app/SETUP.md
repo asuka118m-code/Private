@@ -28,6 +28,10 @@
    - ① Project URL（`https://xxxx.supabase.co`）
    - ② Publishable key（`sb_publishable_...`）。無ければ anon key（`eyJ...` で始まる長い文字列）
 
+### 1-追加. 共有リンク用の設定（共有機能を使う場合）
+
+SQL Editor で新しい入力欄を開き、`supabase/002_share.sql` の中身を全部貼り付けて **Run** を押す（1回だけ）。
+
 ## 2. Anthropic（スクショ読み取りのAI）
 
 AIを使わない場合（テキスト貼り付けだけで使う場合）はこの手順を飛ばしてOKです。

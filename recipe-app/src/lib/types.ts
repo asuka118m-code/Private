@@ -10,6 +10,8 @@ export interface Comment {
   createdAt: number;
   text: string;
   rating?: number; // 1-5
+  author?: string; // 共有リンクから書いた人の名前（自分のコメントは空）
+  shared?: boolean; // 共有リンクから届いたコメント
 }
 
 export interface Recipe {

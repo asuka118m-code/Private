@@ -168,3 +168,12 @@ button.mark-badge.active { transform: scale(1.1); }
 .step-body p { margin: 0; line-height: 1.8; }
 .mark-pop { margin-top: 6px; display: flex; gap: 8px; align-items: flex-start; background: color-mix(in srgb, var(--mk) 10%, #fff); border-left: 3px solid var(--mk);
   border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+/* 共有 */
+.share-modal { gap: 10px; }
+.share-modal > * + * { margin-top: 8px; }
+.share-url { font-size: 13px; background: #fff; border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; word-break: break-all; color: var(--muted); }
+.shared-head { display: flex; align-items: center; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 0 12px; font-weight: 600; }
+.shared-head img { width: 36px; height: 36px; border-radius: 9px; }
+.comments li.from-guest { background: #eef5ff; }
+.c-author { color: var(--text); font-size: 13px; }
+.topbar .btn.small + .btn.small { margin-left: -4px; }
