@@ -7,7 +7,12 @@ const GUEST_NAME_KEY = "recipe-app:guestName";
 export const getOwnerName = () => localStorage.getItem(OWNER_NAME_KEY) || "";
 export const setOwnerName = (n: string) => localStorage.setItem(OWNER_NAME_KEY, n);
 export const getGuestName = () => localStorage.getItem(GUEST_NAME_KEY) || "";
-export const setGuestName = (n: string) => localStorage.setItem(GUEST_NAME_KEY, n);
+/** 共有ページで使う名前を保存（同じページ内の他の欄にも知らせる） */
+export const setGuestName = (n: string) => {
+  const v = n.trim();
+  if (v) localStorage.setItem(GUEST_NAME_KEY, v); else localStorage.removeItem(GUEST_NAME_KEY);
+  window.dispatchEvent(new Event("guestname"));
+};
 
 export const shareUrl = (token: string) => `${location.origin}/s/${token}`;
 
