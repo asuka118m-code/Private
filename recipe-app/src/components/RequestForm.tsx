@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { addRequest, getGuestName, type FoodRequest } from "../lib/share";
+import { GuestNameField } from "./GuestName";
 
 /** 「食べたい」リクエストを送る（レシピ指定 or 自由に書く） */
 export function RequestForm({ token, recipeId, recipeTitle, onSent, initialUrl = "" }: {
@@ -32,7 +33,7 @@ export function RequestForm({ token, recipeId, recipeTitle, onSent, initialUrl =
 
   return (
     <div className="request-form">
-      <input className="input" placeholder="あなたの名前" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
+      <GuestNameField value={name} onChange={setName} />
       <input className="input" maxLength={500} value={text} onChange={(e) => { setText(e.target.value); setMsg(""); }}
         placeholder={recipeId ? "ひとこと（例：週末に食べたい！）※なくてもOK" : "食べたいもの（例：ハンバーグ、辛めのカレー）"} />
       {!recipeId && (

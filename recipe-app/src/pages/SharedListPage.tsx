@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { SharedList } from "../lib/share";
 import { SharedImage } from "../components/SharedImage";
 import { RequestForm } from "../components/RequestForm";
+import { GuestNameBadge } from "../components/GuestName";
 
 const fmt = (t: number) => new Date(t).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
 
@@ -34,6 +35,7 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
       <header className="shared-head">
         <img src="/icons-v2/icon-192.png" alt="" />
         <span>{data.ownerName ? `${data.ownerName}さんのレシピ` : "あじめも"}</span>
+        <GuestNameBadge />
       </header>
       <p className="hint">レシピを開いて、食べた感想や★を送れます。食べたいものがあればリクエストしてね。</p>
 

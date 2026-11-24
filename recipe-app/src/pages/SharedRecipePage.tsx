@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { addSharedComment, getGuestName, getSharedRecipe, type SharedRecipe } from "../lib/share";
 import { SharedImage } from "../components/SharedImage";
 import { RequestForm } from "../components/RequestForm";
+import { GuestNameBadge, GuestNameField } from "../components/GuestName";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { CommentList } from "../components/CommentList";
 import { StepText } from "./RecipeDetail";
@@ -58,6 +59,7 @@ export function SharedRecipePage() {
         ) : (
           <><img src="/icons-v2/icon-192.png" alt="" /><span>{data.ownerName ? `${data.ownerName}さんから届いたレシピ` : "共有されたレシピ"}</span></>
         )}
+        <GuestNameBadge />
       </header>
       {cover && <SharedImage ownerId={data.ownerId} id={cover} className="hero" onClick={() => setZoom(cover)} />}
       <h1 className="recipe-title">{r.title}</h1>
@@ -96,7 +98,7 @@ export function SharedRecipePage() {
         <h2>感想を送る</h2>
         <p className="hint">食べた感想や「ここをこうしてほしい」を{data.ownerName ? `${data.ownerName}さん` : "作った人"}に届けられます。</p>
         <div className="comment-form">
-          <input className="input" placeholder="あなたの名前" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
+          <GuestNameField value={name} onChange={setName} />
           <div className="rating">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} className={n <= rating ? "on" : ""} onClick={() => setRating(n === rating ? 0 : n)} aria-label={`★${n}`}>★</button>
