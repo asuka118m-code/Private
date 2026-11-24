@@ -222,6 +222,10 @@ export async function getInboxTargets(token: string): Promise<{ id: string; labe
   return Array.isArray(data) ? (data as { id: string; label: string }[]) : [];
 }
 export async function addRequestViaInbox(token: string, targetId: string, url: string, text = "") {
-  const { error } = await need().rpc("add_request_via_inbox", { p_inbox_token: token, p_target_id: targetId, p_url: url || null, p_text: text });
+  // 友だち（id が "f:" で始まる）も送れる新しい関数。6回目の設定前は古い関数を使う
+  let { error } = await need().rpc("send_inbox_request", { p_inbox_token: token, p_target: targetId, p_url: url || null, p_text: text });
+  if (error && /send_inbox_request|schema cache/i.test(error.message) && !targetId.startsWith("f:")) {
+    ({ error } = await need().rpc("add_request_via_inbox", { p_inbox_token: token, p_target_id: targetId, p_url: url || null, p_text: text }));
+  }
   if (error) throw new Error(/見つかりません|止められ|名前|正しく|ありません|多すぎ|使えません/.test(error.message) ? error.message : `送れませんでした：${error.message}`);
 }

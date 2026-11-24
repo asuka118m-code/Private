@@ -50,6 +50,10 @@ SQL Editor で `supabase/005_accounts.sql` の中身を全部貼り付けて **R
 
 Vercel の `ALLOWED_EMAILS` は「AIを使える人」の意味になる（自分のメールアドレスだけにしておく）。
 
+### 1-追加5. 友だち機能用の設定
+
+SQL Editor で `supabase/006_friends.sql` の中身を全部貼り付けて **Run**（1回だけ）。
+
 ## 2. Anthropic（スクショ読み取りのAI）
 
 AIを使わない場合（テキスト貼り付けだけで使う場合）はこの手順を飛ばしてOKです。

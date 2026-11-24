@@ -11,6 +11,7 @@ import { CategorySelectPage } from "./pages/CategorySelectPage";
 import { SharedRecipePage } from "./pages/SharedRecipePage";
 import { SharedEntryPage } from "./pages/SharedEntryPage";
 import { InboxSavePage } from "./pages/InboxSavePage";
+import { FriendAcceptPage, FriendRecipesRoute, FriendsPage } from "./pages/FriendsPage";
 import "./styles.css";
 import { initSync } from "./lib/useSync";
 
@@ -35,6 +36,10 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/s/:token/r/:recipeId" element={<SharedRecipePage />} />
         <Route path="/requests" element={<Navigate to="/?view=requests" replace />} />
         <Route path="/inbox/:token" element={<InboxSavePage />} />
+        <Route path="/friends" element={<FriendsPage />} />
+        <Route path="/friends/:friendId" element={<FriendRecipesRoute />} />
+        <Route path="/friends/:friendId/r/:recipeId" element={<SharedRecipePage />} />
+        <Route path="/friend/:code" element={<FriendAcceptPage />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

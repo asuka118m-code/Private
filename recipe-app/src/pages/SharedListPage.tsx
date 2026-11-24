@@ -9,7 +9,9 @@ import { addTarget, listTargets } from "../lib/profile";
 const fmt = (t: number) => new Date(t).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
 
 /** 一覧の共有リンクを開いた人が見るページ（見るだけ・ログイン不要） */
-export function SharedListPage({ token, list }: { token: string; list: SharedList }) {
+/** friendId があれば「友だちのレシピ」（アプリの中から見る） */
+export function SharedListPage({ token, list, friendId }: { token: string; list: SharedList; friendId?: string }) {
+  const base = friendId ? `/friends/${friendId}` : `/s/${token}`;
   const [data, setData] = useState(list);
   const [cat, setCat] = useState("");
   const [q, setQ] = useState("");
@@ -22,7 +24,7 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
   const shortcutBase = `${location.origin}/s/${token}?url=`;
   // ログインしている人：このリンクを「リクエスト先」に登録できる
   const sync = useSyncState();
-  const isOther = !!sync.session && sync.session.user.id !== data.ownerId;
+  const isOther = !friendId && !!sync.session && sync.session.user.id !== data.ownerId;
   const [targeted, setTargeted] = useState<boolean | null>(null);
   const [targetMsg, setTargetMsg] = useState("");
   useEffect(() => { if (isOther) listTargets().then((t) => setTargeted(t.some((x) => x.token === token))); }, [isOther, token]);
@@ -40,7 +42,7 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
   return (
     <div className="page shared-page">
       <header className="shared-head">
-        <img src="/icons-v2/icon-192.png" alt="" />
+        {friendId ? <Link to="/friends" className="back">‹ 友だち</Link> : <img src="/icons-v2/icon-192.png" alt="" />}
         <span>{data.ownerName ? `${data.ownerName}さんのレシピ` : "あじめも"}</span>
       </header>
       <p className="hint">レシピを開いて、食べた感想や★を送れます。食べたいものがあればリクエストしてね。</p>
@@ -60,7 +62,7 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
               <li key={r.id}>
                 <b>{r.author}</b>
                 <span>
-                  {r.recipeId && titleOf(r.recipeId) ? <Link to={`/s/${token}/r/${r.recipeId}`} className="recipe-link">{titleOf(r.recipeId)}</Link> : null}
+                  {r.recipeId && titleOf(r.recipeId) ? <Link to={`${base}/r/${r.recipeId}`} className="recipe-link">{titleOf(r.recipeId)}</Link> : null}
                   {r.recipeId && r.text ? "　" : ""}{r.text}
                   {r.url && <a href={r.url} target="_blank" rel="noreferrer" className="ref-link">🔗 参考</a>}
                 </span>
@@ -68,18 +70,18 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
               </li>
             ))}
           </ul>
-        ) : <p className="hint small">まだありません。</p>}
+        ) : friendId ? null : <p className="hint small">まだありません。</p>}
         {sharedUrl && asking && <p className="hint small">共有されたURLが入っています。名前とひとことを入れて送ってください。</p>}
         {asking ? (
-          <RequestForm token={token} initialUrl={sharedUrl}
+          <RequestForm token={token} friendId={friendId} initialUrl={sharedUrl}
             onSent={(r) => { setData((d) => ({ ...d, requests: [r, ...d.requests] })); setAsking(false); if (sharedUrl) setParams({}, { replace: true }); }} />
         ) : (
           <button className="btn" onClick={() => setAsking(true)}>＋ 食べたいものをリクエスト</button>
         )}
-        <button className="link small" onClick={() => setHowto(!howto)}>
+        {!friendId && <button className="link small" onClick={() => setHowto(!howto)}>
           {howto ? "閉じる" : "📱 InstagramなどからそのままリクエストするにはiPhone・iPadの「ショートカット」"}
-        </button>
-        {howto && (
+        </button>}
+        {howto && !friendId && (
           <div className="howto-box">
             <p className="hint small">一度だけ作ると、Instagramやレシピサイトの共有ボタンに「あじめもにリクエスト」が出て、そのURLでリクエストできます。</p>
             <ol className="howto">
@@ -111,7 +113,7 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
       <ul className="recipe-grid">
         {shown.map((r) => (
           <li key={r.id}>
-            <Link to={`/s/${token}/r/${r.id}`} className="card cook-card">
+            <Link to={`${base}/r/${r.id}`} className="card cook-card">
               {r.cover ? <SharedImage ownerId={data.ownerId} id={r.cover} className="card-img" /> : <div className="card-img noimg">🍳</div>}
               {r.cookedCount > 0 && <span className="cook-badge done">✓ 作った {r.cookedCount}回</span>}
               <div className="card-body"><div className="card-title">{r.title || "（無題）"}</div></div>
