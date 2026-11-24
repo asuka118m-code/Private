@@ -96,32 +96,35 @@ export function RecipeList() {
       {openRequests > 0 && !showRequests && (
         <button className="notice request-notice" onClick={() => setShowRequests(true)}>🙋 食べたいリクエストが{openRequests}件届いています ›</button>
       )}
-      <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
-      <nav className="cat-bar">
-        <button className={`chip ${!view && current === "" ? "on" : ""}`} onClick={() => { select(""); setView(null); }}>すべて <span>{recipes?.length ?? 0}</span></button>
-        {categories.map((c) => (
-          <button key={c.id} className={`chip ${!view && current === c.id ? "on" : ""}`} onClick={() => { select(c.id); setView(null); }}>
-            {c.name} <span>{count(c.id)}</span>
+      {sync.session && (
+        <nav className="view-tabs" aria-label="表示の切り替え">
+          <button className={!view ? "on" : ""} onClick={() => setView(null)}>📖 レシピ</button>
+          <button className={showRequests ? "on" : ""} onClick={() => setView("requests")}>
+            🙋 リクエスト{openRequests > 0 && <span className="tab-count">{openRequests}</span>}
           </button>
-        ))}
-        {sync.session && (
-          <button className={`chip req-chip ${showRequests ? "on" : ""}`} onClick={() => setShowRequests(!showRequests)}>
-            🙋 リクエスト {openRequests > 0 && <span className="req-count">{openRequests}</span>}
+          <button className={showInbox ? "on" : ""} onClick={() => setView("inbox")}>
+            🔖 あとで{openInbox > 0 && <span className="tab-count inbox">{openInbox}</span>}
           </button>
-        )}
-        {sync.session && <Link to="/friends" className="chip friend-chip">👥 友だち</Link>}
-        {sync.session && (inbox.length > 0 || showInbox) && (
-          <button className={`chip inbox-chip ${showInbox ? "on" : ""}`} onClick={() => setView(showInbox ? null : "inbox")}>
-            🔖 あとで登録 {openInbox > 0 && <span className="req-count inbox-count">{openInbox}</span>}
-          </button>
-        )}
-        <Link to="/categories" className="chip ghost">{categories.length ? "✎ カテゴリ編集" : "＋ カテゴリを作る"}</Link>
-      </nav>
+          <Link to="/friends">👥 友だち</Link>
+        </nav>
+      )}
       {showRequests ? (
         <RequestBoard requests={requests} recipes={recipes ?? []} onChange={setRequests} />
       ) : showInbox ? (
         <InboxBoard items={inbox} recipes={recipes ?? []} onChange={setInbox} />
       ) : (<>
+      <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="cat-row">
+        <nav className="cat-bar" aria-label="カテゴリ">
+          <button className={`chip ${current === "" ? "on" : ""}`} onClick={() => select("")}>すべて <span>{recipes?.length ?? 0}</span></button>
+          {categories.map((c) => (
+            <button key={c.id} className={`chip ${current === c.id ? "on" : ""}`} onClick={() => select(c.id)}>
+              {c.name} <span>{count(c.id)}</span>
+            </button>
+          ))}
+        </nav>
+        <Link to="/categories" className="cat-edit">{categories.length ? "✎ 編集" : "＋ 作る"}</Link>
+      </div>
       {current && (
         <Link to={`/categories/${current}/select`} className="btn wide add-to-cat">＋ レシピを選んで「{categories.find((c) => c.id === current)?.name}」に追加</Link>
       )}
