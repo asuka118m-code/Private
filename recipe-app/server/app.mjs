@@ -45,24 +45,33 @@ app.post("/api/import/url", async (req, res) => {
     return res.status(400).json({ error: "URLが正しくありません" });
   }
   try {
+    // Instagram などのSNSは、リンクのプレビュー用の情報（投稿の説明文）を取る
+    const sns = /(^|\.)(instagram\.com|threads\.net|facebook\.com)$/i.test(target.hostname);
     const r = await fetch(target, {
-      headers: { "user-agent": "Mozilla/5.0 (compatible; RecipeBox/1.0)", "accept-language": "ja,en;q=0.8" },
+      headers: {
+        "user-agent": sns ? "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" : "Mozilla/5.0 (compatible; RecipeBox/1.0)",
+        "accept-language": "ja,en;q=0.8",
+      },
       signal: AbortSignal.timeout(15000),
     });
-    if (!r.ok) throw new Error(`ページを取得できませんでした (${r.status})`);
+    if (!r.ok) throw new Error(`ページを読み込めませんでした（${r.status}）。ログインが必要なページかもしれません`);
     const parsed = parseRecipeHtml(await r.text(), target.href);
     if (parsed.found) {
       const { found, imageUrl, ...recipe } = parsed;
       return res.json({ recipes: [recipe], imageUrl, method: "structured" });
     }
-    if (aiAvailable() && parsed.pageText) {
-      const recipes = await extractWithClaude({ text: parsed.pageText });
+    // 投稿の説明文（SNSのキャプションなど）＋ページ本文から探す
+    const text = [parsed.description, parsed.pageText].filter(Boolean).join("\n\n");
+    if (aiAvailable() && text) {
+      const recipes = await extractWithClaude({ text });
       return res.json({ recipes: recipes.slice(0, 1), imageUrl: parsed.imageUrl, method: "ai" });
     }
-    const guess = parseRecipeText(parsed.pageText || "");
+    const fromCaption = parsed.description ? parseRecipeText(parsed.description) : null;
+    const guess = fromCaption && (fromCaption.ingredients.length || fromCaption.steps.length) ? fromCaption : parseRecipeText(parsed.pageText || "");
     return res.json({ recipes: [{ ...guess, title: parsed.title || guess.title }], imageUrl: parsed.imageUrl, method: "text" });
   } catch (e) {
-    res.status(502).json({ error: errMsg(e) });
+    const m = errMsg(e);
+    res.status(502).json({ error: /fetch failed|timeout|aborted/i.test(m) ? "ページを開けませんでした。URLを確認するか、手入力で作ってください" : m });
   }
 });
 

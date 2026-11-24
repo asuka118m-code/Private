@@ -130,3 +130,18 @@ A（合わせ調味料）
     expect(b.ingredients).toEqual([{ name: "レタス", amount: "1/2玉" }, { name: "トマト", amount: "1個" }]);
   });
 });
+
+describe("SNSの説明文", () => {
+  it("Instagramのプレビュー文から本文を取り出してレシピにできる", async () => {
+    const { snsCaption, parseRecipeHtml } = await import("../server/parse.mjs");
+    const desc = '1,234 likes, 56 comments - umetuna_onigiri on November 1, 2026: "松菜とツナのおにぎり🍙\n【材料】2個分\nごはん 300g\nツナ缶 1缶\n小松菜 2株\n醤油 小さじ1\n【作り方】\n1. 小松菜を刻んで炒める\n2. ツナと醤油を混ぜる\n3. ごはんに混ぜて握る\n#おにぎり".';
+    const cap = snsCaption(desc);
+    expect(cap.startsWith("松菜とツナのおにぎり")).toBe(true);
+    const html = `<html><head><meta property="og:description" content='${desc.replace(/'/g, "&#39;")}'><meta property="og:image" content="https://x/img.jpg"></head><body></body></html>`;
+    const r = parseRecipeHtml(html, "https://www.instagram.com/reel/abc/");
+    const t = parseRecipeText(r.description);
+    expect(t.title).toBe("松菜とツナのおにぎり🍙");
+    expect(t.ingredients.map((i) => i.name)).toEqual(["ごはん", "ツナ缶", "小松菜", "醤油"]);
+    expect(t.steps).toHaveLength(3);
+  });
+});

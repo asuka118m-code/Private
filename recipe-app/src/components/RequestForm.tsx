@@ -2,12 +2,13 @@ import { useState } from "react";
 import { addRequest, getGuestName, type FoodRequest } from "../lib/share";
 
 /** 「食べたい」リクエストを送る（レシピ指定 or 自由に書く） */
-export function RequestForm({ token, recipeId, recipeTitle, onSent }: {
+export function RequestForm({ token, recipeId, recipeTitle, onSent, initialUrl = "" }: {
   token: string; recipeId?: string; recipeTitle?: string; onSent?: (r: FoodRequest) => void;
+  initialUrl?: string; // 共有メニュー（ショートカット）から来た時のURL
 }) {
   const [name, setName] = useState(getGuestName());
   const [text, setText] = useState("");
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
