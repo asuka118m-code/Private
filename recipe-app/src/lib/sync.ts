@@ -44,6 +44,8 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   // ---- 1. 送信：前回の同期以降に変更・削除したもの ----
   const lastPushAt = (await getMeta<number>("lastPushAt")) ?? 0;
   const pushStart = Date.now();
+  // 時計を1ミリ秒以上進めてから読む：読んだ後の保存は必ず pushStart より後の時刻になり、取りこぼさない
+  await new Promise((r) => setTimeout(r, 2));
   const changed = (await db.getAll("recipes")).filter((r) => r.updatedAt > lastPushAt);
   const tombstones = await db.getAll("tombstones");
 

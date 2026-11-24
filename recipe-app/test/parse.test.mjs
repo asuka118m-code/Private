@@ -26,7 +26,7 @@ describe("parseRecipeText", () => {
 大根を加える
 3. 醤油で味付け
 #簡単レシピ`);
-    expect(r.title).toBe("やみつき豚バラ大根🐷");
+    expect(r.title).toBe("やみつき豚バラ大根");
     expect(r.servings).toBe("2人分");
     expect(r.ingredients).toEqual([
       { name: "豚バラ", amount: "200g" }, { name: "大根", amount: "1/3本" }, { name: "醤油", amount: "大さじ2" },
@@ -140,7 +140,7 @@ describe("SNSの説明文", () => {
     const html = `<html><head><meta property="og:description" content='${desc.replace(/'/g, "&#39;")}'><meta property="og:image" content="https://x/img.jpg"></head><body></body></html>`;
     const r = parseRecipeHtml(html, "https://www.instagram.com/reel/abc/");
     const t = parseRecipeText(r.description);
-    expect(t.title).toBe("松菜とツナのおにぎり🍙");
+    expect(t.title).toBe("松菜とツナのおにぎり");
     expect(t.ingredients.map((i) => i.name)).toEqual(["ごはん", "ツナ缶", "小松菜", "醤油"]);
     expect(t.steps).toHaveLength(3);
   });

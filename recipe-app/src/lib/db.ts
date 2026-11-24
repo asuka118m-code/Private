@@ -156,7 +156,7 @@ export async function saveDraftAsRecipe(d: RecipeDraft) {
   const now = Date.now();
   return saveRecipe({
     id: newId(), title: d.title || "（無題）", servings: d.servings, ingredients: d.ingredients, steps: d.steps,
-    sourceUrl: d.sourceUrl, sourceImageIds, photoIds: [], memo: "", comments: [], createdAt: now, updatedAt: now,
+    sourceUrl: d.sourceUrl, sourceImageIds, photoIds: [], memo: d.memo ?? "", comments: [], createdAt: now, updatedAt: now,
     categoryIds: d.categoryIds ?? [],
   });
 }

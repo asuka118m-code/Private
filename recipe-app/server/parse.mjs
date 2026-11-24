@@ -2,7 +2,7 @@
 import * as cheerio from "cheerio";
 import { parseRecipeText, splitIngredient, stripStepNumber } from "../shared/textparse.mjs";
 
-export { parseRecipeText, parseRecipesText, splitIngredient } from "../shared/textparse.mjs";
+export { parseRecipeText, parseRecipesText, splitIngredient, cleanTitle } from "../shared/textparse.mjs";
 
 function flattenInstructions(ins) {
   if (!ins) return [];

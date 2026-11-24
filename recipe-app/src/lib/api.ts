@@ -6,6 +6,7 @@ import { parseRecipesText } from "../../shared/textparse.mjs";
 export interface ImportedRecipe {
   title: string;
   servings?: string;
+  memo?: string; // キャプションの「ポイント」など
   ingredients: Ingredient[];
   steps: string[];
 }

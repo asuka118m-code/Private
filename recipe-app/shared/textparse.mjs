@@ -51,7 +51,7 @@ function splitIngredientBody(s) {
 
 export const stripStepNumber = (s) =>
   String(s)
-    .replace(/^\s*(?:STEP\s*)?(?:[0-9０-９]+|[①-⑳])\s*[.．、)）:：]?\s*/i, "")
+    .replace(/^\s*(?:STEP\s*)?(?:[0-9０-９]+|[①-⑳❶-❿➀-➉])\s*[.．、)）:：]?\s*/i, "")
     .trim();
 
 const MARK = "[【\\[\\(（<＜■□◆◇●○★☆▼▽▶︎・]*\\s*";
@@ -98,53 +98,143 @@ export function parseRecipesText(text) {
     .filter((r) => r.ingredients.length || r.steps.length);
 }
 
+// ---- キャプション読み取りの部品 ----
+const EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}]/gu;
+// 行頭の飾り（絵文字・括弧・記号）を外して見出しを判定する
+const stripDeco = (s) => String(s).replace(EMOJI, "").replace(/^[\s【\[\(（<＜≪《〈■□◆◇●○◎★☆▼▽▶▷►︎・＼\/／✔✓︎:：\-－ー=＝_~〜*＊|｜]+/, "").trim();
+const CLOSE = "[\\s】\\]）)>＞》〉≫:：\\-－]*";
+const ING_HEAD = /^(材料|用意するもの|ingredients?)(?![をがはにで])/i;
+const SUB_HEAD = new RegExp(`^(調味料|合わせ調味料|タレ|たれ|ソース|下味|衣|ドレッシング|トッピング|仕上げ|飾り|具材|生地)${CLOSE}$`);
+// 見出しだけの行（「作り方」「作り方（2人分）」「How to make」「作り方はこちら👇」）。「STEP1 〜」のような手順の行は含めない
+const STEP_HEAD = /^(作り方|つくり方|作りかた|手順|how\s*to(\s*make)?|steps?|directions|instructions|recipe|レシピ(?!名))(\s*[（(][^）)]*[）)])?(はこちら|です|♪)?[\s】\]）)>＞》〉≫:：\-－!！。.…]*$/i;
+const MEMO_HEAD = /^(ポイント|point|コツ|memo|メモ|保存方法|保存期間|保存について|アレンジ|注意|tips?|補足)(\s*[（(][^）)]*[）)])?[\s】\]）)>＞》〉≫:：\-－!！。.…]*$/i;
+const STEP_NUM = /^\s*(?:step\s*[0-9０-９]+\s*[.．:：)）]?|[0-9０-９]{1,2}\s*[.．、)）:：]|[0-9０-９]{1,2}\s+(?=[^\s0-9０-９\/／.個本枚gml])|[①-⑳❶-❿➀-➉])/i;
+const PROMO = /(保存して|保存してね|保存お願い|保存推奨|いいね|フォロー|プロフ|@[\w.]+|#PR|ＰＲ|(^|\s)PR(\s|$)|コメント(して|ください|待って|お待ち)|詳しくは|ストーリーズ?|楽天ROOM|ハイライト|リンクから|DMで|コラボ|投稿しています)/i;
+const HASHTAGS = /^(#\S+\s*)+$/;
+const SEPARATOR_LINE = /^(?:[-－ー=＝_＿~〜*＊・.…]\s*){3,}$/;
+const QTY = /^(約|各)?\s*([0-9０-９½¼¾⅓⅔]|大さじ|小さじ|カップ|少々|適量|適宜|お好み|ひとつまみ|少量|ひとかけ|ひと?片|半分|１|１\/)/;
+
+/** 「醤油 大さじ2」のような材料らしい行か */
+function ingredientLike(line) {
+  const s = String(line).trim();
+  if (!s || s.length > 40 || /[。]$/.test(s) || STEP_NUM.test(s)) return false;
+  const ing = splitIngredient(s);
+  if (!ing || !ing.amount || !QTY.test(ing.amount)) return false;
+  return ing.name.length <= 20 && !/[をでてにがは]$/.test(ing.name);
+}
+
+/** 1行に「春雨40g、きゅうり1本」のように並んでいれば分ける */
+function splitIngredientLine(line) {
+  const parts = String(line).split(/[、,，]/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length >= 2 && parts.every(ingredientLike)) return parts.map(splitIngredient);
+  const one = splitIngredient(line);
+  return one ? [one] : [];
+}
+
+/** キャプションの1行から料理名だけを取り出す */
+export function cleanTitle(raw) {
+  let s = String(raw || "").replace(/#\S+/g, "").trim();
+  const quoted = s.replace(EMOJI, "").match(/[「『【]([^」』】]{2,30})[」』】]/);
+  if (quoted && !/保存版|PR|簡単|時短|節約|必見|人気|殿堂|大好評|リピ|絶品|話題/.test(quoted[1])) s = quoted[1];
+  s = s.replace(/[【\[][^】\]]*[】\]]/g, " "); // 【保存版】などのタグ
+  s = s.replace(EMOJI, " ").replace(/[＼\\\/／]/g, " ").replace(/\s+/g, " ").trim();
+  s = s.split(/\s*[｜|]\s*/)[0];
+  s = s.replace(/^(今日|本日|昨日)(の(晩|夜|昼|朝)(ごはん|ご飯|ゴハン))?(は|も)\s*/, "");
+  const made = s.match(/^(.{2,25}?)を(作|つく)/);
+  if (made) s = made[1];
+  s = s.replace(/^((簡単|絶品|やみつき注意|激うま|爆速|時短|節約|超簡単|ほったらかし)[!！]?\s+)+/, "");
+  s = s.replace(/^(簡単|絶品|激うま|超簡単)[!！]\s*/, "");
+  s = s.replace(/(の)?(作り方|つくり方|レシピ)(です|でした)?[!！。♪~〜]*$/, "");
+  s = s.replace(/[!！。、♪~〜…\s]+$/, "").trim();
+  if (s.length > 30) s = s.split(/[。！!、]/)[0].slice(0, 30);
+  return s;
+}
+
+const isTagline = (s) => /^[＼\\]|[／\/]$/.test(s.trim()) || /^[!！?？。、…\s]*$/.test(stripDeco(s));
+
 /** SNSのキャプションなど、プレーンテキストからレシピを推測 */
 export function parseRecipeText(text) {
-  const lines = String(text)
-    .split(/\r?\n/)
-    .map((l) => l.trim());
+  const lines = String(text).split(/\r?\n/).map((l) => l.replace(/[​　]/g, " ").trim());
   let title = "";
   let servings = "";
+  const titleCands = [];
   const ingredients = [];
   const steps = [];
-  let mode = "none";
+  const memo = [];
+  let mode = "none"; // none → ing → step → memo / after / done
   let groupMark = "";
+  let numbered = false; // 作り方に番号が付いているか
+  let blank = false;
+
+  const findServings = (line) => line.match(/[0-9０-９]+(?:\s*[〜~\-]\s*[0-9０-９]+)?\s*(?:人分|人前|個分|皿分|台分|枚分|本分|杯分|合分)/)?.[0] ?? "";
+  const pushIngredients = (line) => {
+    const head = takeMark(line.replace(/^[・\-\*•·]+\s*/, ""));
+    if (head.mark && !head.rest) { groupMark = head.mark; return; } // 「【A】」「A（合わせ調味料）」の見出し行
+    for (const ing of splitIngredientLine(line)) ingredients.push(!ing.mark && groupMark ? { ...ing, mark: groupMark } : ing);
+  };
+  const pushStep = (line) => { steps.push(stripStepNumber(line)); };
+
   for (const line of lines) {
-    if (!line && mode !== "ing") continue;
+    if (!line) { blank = true; if (mode === "ing") groupMark = ""; continue; }
+    const wasBlank = blank;
+    blank = false;
+    const deco = stripDeco(line);
     const t = line.match(TITLE_HEAD);
     if (t) { if (!title) title = t[2].trim(); continue; }
-    if (ingHead.test(line)) {
+    if (HASHTAGS.test(line)) continue;
+    if (SEPARATOR_LINE.test(line)) { if (mode !== "none") mode = "after"; continue; }
+
+    // 見出し
+    if (ING_HEAD.test(deco) && (deco.length <= 30 || /^(材料|ingredients?)\s*[（(]?[^：:]{0,12}[：:]/i.test(deco))) {
       mode = "ing";
-      servings ||= line.match(/[0-9０-９〜~\-]+\s*(?:人分|人前|個分|皿分)/)?.[0] ?? "";
+      servings ||= findServings(line);
+      const rest = deco.replace(ING_HEAD, "").replace(/^[\s】\])）>＞》:：]+/, "").replace(/^[（(][^）)]*[）)]\s*/, "").trim();
+      if (rest && !findServings(rest) && splitIngredientLine(rest).some((i) => i.amount)) pushIngredients(rest);
+      else if (rest && rest.includes("、")) pushIngredients(rest);
       continue;
     }
-    if (stepHead.test(line)) { mode = "step"; continue; }
-    if (/^#/.test(line)) continue; // ハッシュタグ
+    if (SUB_HEAD.test(deco) && (mode === "ing" || mode === "none")) { mode = "ing"; continue; }
+    if (STEP_HEAD.test(deco.replace(EMOJI, "").trim())) { mode = "step"; continue; }
+    if (MEMO_HEAD.test(deco.replace(EMOJI, "").trim()) && mode !== "none") { mode = "memo"; continue; }
+    if (PROMO.test(line) && !STEP_NUM.test(line)) { if (mode === "step" || mode === "memo" || mode === "after") mode = "done"; continue; }
+    if (mode === "done") continue;
+
+    const isNum = STEP_NUM.test(line);
     if (mode === "none") {
-      if (!title) title = line.replace(/^[【\[]|[】\]]$/g, "");
-      // 番号付きの行は手順とみなす
-      if (/^(?:[0-9０-９]+[.．、)）]|[①-⑳])/.test(line)) { mode = "step"; steps.push(stripStepNumber(line)); }
+      if (isNum && !ingredientLike(line)) { mode = "step"; numbered = true; pushStep(line); }
+      else if (ingredientLike(line) || takeMark(line).mark && ingredientLike(takeMark(line).rest)) { mode = "ing"; pushIngredients(line); }
+      else titleCands.push(line);
       continue;
     }
     if (mode === "ing") {
-      if (/^(?:[0-9０-９]+[.．、)）]|[①-⑳])/.test(line) && !/[個本枚gml]$/.test(line)) {
-        mode = "step"; steps.push(stripStepNumber(line)); continue;
-      }
-      if (!line) { groupMark = ""; continue; } // 空行で「A」などのまとまりが終わる
-      const head = takeMark(line.replace(/^[・\-\*•·]+\s*/, ""));
-      if (head.mark && !head.rest) { groupMark = head.mark; continue; } // 「【A】」「A（合わせ調味料）」の見出し行
-      const ing = splitIngredient(line);
-      if (ing) ingredients.push(!ing.mark && groupMark ? { ...ing, mark: groupMark } : ing);
-    } else if (mode === "step") {
-      const isNumbered = /^(?:STEP\s*)?(?:[0-9０-９]+[.．、)）:：]?|[①-⑳])/i.test(line);
-      if (!isNumbered && steps.length) steps[steps.length - 1] += line; // 折り返し行は前の手順へ
-      else steps.push(stripStepNumber(line));
+      if (isNum && !ingredientLike(line)) { mode = "step"; numbered = true; pushStep(line); continue; }
+      if (ingredientLike(line) || /^[^\s。]{1,15}$/.test(line) || takeMark(line).mark) { pushIngredients(line); continue; }
+      // 材料の途中に文章が来たら、番号のない作り方とみなす
+      if (/[。！!]$/.test(line) || line.length > 20) { mode = "step"; pushStep(line); continue; }
+      pushIngredients(line);
+      continue;
     }
+    if (mode === "step") {
+      if (isNum) { numbered = true; pushStep(line); continue; }
+      if (numbered && wasBlank) { mode = "after"; memo.push(line); continue; } // 番号付きの作り方のあとの空行＋文章は、作り方の外
+      if (numbered && steps.length) { steps[steps.length - 1] += line; continue; } // 折り返し行は前の手順へ
+      pushStep(line);
+      continue;
+    }
+    if (mode === "memo" || mode === "after") { memo.push(line); continue; }
   }
+
+  if (!title) {
+    const cand = titleCands.find((l) => !isTagline(l)) ?? titleCands[0] ?? "";
+    const quoted = titleCands.find((l) => /[「『【][^」』】]{2,30}[」』】]/.test(l) && !/^[【\[][^】\]]*[】\]]$/.test(l.trim()));
+    title = cleanTitle(quoted ?? cand);
+  }
+  servings ||= lines.map(findServings).find(Boolean) ?? "";
+
   // 全部の材料の頭に同じ記号（●など）が付いているのは、印ではなくただの箇条書き
   const symbolMarks = ingredients.map((i) => i.mark).filter((m) => m && !/^[A-E]$/.test(m));
   if (ingredients.length >= 2 && symbolMarks.length === ingredients.length && new Set(symbolMarks).size === 1) {
     for (const i of ingredients) delete i.mark;
   }
-  return { title, servings, ingredients, steps: steps.filter(Boolean) };
+  return { title, servings, ingredients, steps: steps.filter(Boolean), memo: memo.join("\n").trim() };
 }

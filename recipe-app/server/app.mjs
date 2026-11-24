@@ -1,7 +1,7 @@
 // API本体（ローカル実行・Vercel共通）
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
-import { parseRecipeHtml, parseRecipeText } from "./parse.mjs";
+import { cleanTitle, parseRecipeHtml, parseRecipeText } from "./parse.mjs";
 import { aiAvailable, extractWithClaude } from "./ai.mjs";
 
 const app = express();
@@ -76,7 +76,9 @@ app.post("/api/import/url", async (req, res) => {
     }
     const fromCaption = parsed.description ? parseRecipeText(parsed.description) : null;
     const guess = fromCaption && (fromCaption.ingredients.length || fromCaption.steps.length) ? fromCaption : parseRecipeText(parsed.pageText || "");
-    return res.json({ recipes: [{ ...guess, title: parsed.title || guess.title }], imageUrl: parsed.imageUrl, method: "text" });
+    // キャプションから読めた時はその料理名、読めない時はページの題名を整えて使う
+    const title = (fromCaption && guess === fromCaption && guess.title) || cleanTitle(parsed.title) || guess.title;
+    return res.json({ recipes: [{ ...guess, title }], imageUrl: parsed.imageUrl, method: "text" });
   } catch (e) {
     const m = errMsg(e);
     res.status(502).json({ error: /fetch failed|timeout|aborted/i.test(m) ? "ページを開けませんでした。URLを確認するか、手入力で作ってください" : m });
