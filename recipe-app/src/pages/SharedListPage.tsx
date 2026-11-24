@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { SharedList } from "../lib/share";
 import { SharedImage } from "../components/SharedImage";
 import { RequestForm } from "../components/RequestForm";
@@ -11,7 +11,13 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
   const [data, setData] = useState(list);
   const [cat, setCat] = useState("");
   const [q, setQ] = useState("");
-  const [asking, setAsking] = useState(false);
+  // 共有メニュー（ショートカット）から来た時：URLが入った状態でリクエスト欄を開く
+  const [params, setParams] = useSearchParams();
+  const sharedUrl = params.get("url") || "";
+  const [asking, setAsking] = useState(!!sharedUrl);
+  const [howto, setHowto] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shortcutBase = `${location.origin}/s/${token}?url=`;
   const titleOf = (id: string | null) => data.recipes.find((r) => r.id === id)?.title;
   const cats = data.categories.filter((c) => data.recipes.some((r) => r.categoryIds.includes(c.id)));
 
@@ -48,10 +54,30 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
             ))}
           </ul>
         ) : <p className="hint small">まだありません。</p>}
+        {sharedUrl && asking && <p className="hint small">共有されたURLが入っています。名前とひとことを入れて送ってください。</p>}
         {asking ? (
-          <RequestForm token={token} onSent={(r) => { setData((d) => ({ ...d, requests: [r, ...d.requests] })); setAsking(false); }} />
+          <RequestForm token={token} initialUrl={sharedUrl}
+            onSent={(r) => { setData((d) => ({ ...d, requests: [r, ...d.requests] })); setAsking(false); if (sharedUrl) setParams({}, { replace: true }); }} />
         ) : (
           <button className="btn" onClick={() => setAsking(true)}>＋ 食べたいものをリクエスト</button>
+        )}
+        <button className="link small" onClick={() => setHowto(!howto)}>
+          {howto ? "閉じる" : "📱 InstagramなどからそのままリクエストするにはiPhone・iPadの「ショートカット」"}
+        </button>
+        {howto && (
+          <div className="howto-box">
+            <p className="hint small">一度だけ作ると、Instagramやレシピサイトの共有ボタンに「あじめもにリクエスト」が出て、そのURLでリクエストできます。</p>
+            <ol className="howto">
+              <li>「ショートカット」アプリで右上の「＋」→ 名前を「あじめもにリクエスト」にする</li>
+              <li>「<b>URLをエンコード</b>」を追加する（入力は「ショートカットの入力」）</li>
+              <li>「<b>テキスト</b>」を追加して下の文字を貼り、その後ろに「URLエンコードされたテキスト」を入れる
+                <div className="share-url">{shortcutBase}</div>
+                <button className="btn small" onClick={async () => { await navigator.clipboard?.writeText(shortcutBase); setCopied(true); }}>{copied ? "コピーしました" : "この文字をコピー"}</button>
+              </li>
+              <li>「<b>URLを開く</b>」を追加する</li>
+              <li>詳細（ⓘ）で「<b>共有シートに表示</b>」をオンにする</li>
+            </ol>
+          </div>
         )}
       </section>
 
