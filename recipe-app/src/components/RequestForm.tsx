@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { addRequest, getGuestName, type FoodRequest } from "../lib/share";
 import { GuestNameField } from "./GuestName";
+import { addFriendRequest } from "../lib/friends";
 
 /** 「食べたい」リクエストを送る（レシピ指定 or 自由に書く） */
-export function RequestForm({ token, recipeId, recipeTitle, onSent, initialUrl = "" }: {
-  token: string; recipeId?: string; recipeTitle?: string; onSent?: (r: FoodRequest) => void;
+export function RequestForm({ token, friendId, recipeId, recipeTitle, onSent, initialUrl = "" }: {
+  token: string; friendId?: string; recipeId?: string; recipeTitle?: string; onSent?: (r: FoodRequest) => void;
   initialUrl?: string; // 共有メニュー（ショートカット）から来た時のURL
 }) {
   const [name, setName] = useState(getGuestName());
@@ -19,7 +20,9 @@ export function RequestForm({ token, recipeId, recipeTitle, onSent, initialUrl =
     try {
       const link = url.trim();
       if (link && !/^https?:\/\//.test(link)) throw new Error("URLは https:// から始まる形で貼ってください");
-      const r = await addRequest(token, name.trim(), text.trim(), recipeId, link || undefined);
+      const r = friendId
+        ? await addFriendRequest(friendId, text.trim(), link || undefined, recipeId)
+        : await addRequest(token, name.trim(), text.trim(), recipeId, link || undefined);
       setText("");
       setUrl("");
       setMsg(recipeTitle ? `「${recipeTitle}」をリクエストしました！` : "リクエストを送りました！");

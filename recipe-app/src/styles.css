@@ -251,3 +251,8 @@ button.notice { width: 100%; text-align: left; border: 0; font: inherit; cursor:
 .copy-btn { width: 100%; margin-top: 12px; border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .target-btn { color: #2c5aa0; background: #eef4ff; }
 .target-send { border-color: #b9d0f3; color: #2c5aa0; margin-bottom: 0; }
+/* 友だち */
+.friend-chip { border-color: #b9e0c6; color: #2f7d4d; background: #f0faf3; text-decoration: none; }
+.friend-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.friend-list li { display: flex; justify-content: space-between; align-items: center; background: #f7fbf8; border-radius: 10px; padding: 10px 12px; }
+.friend-link { font-weight: 600; color: #2f7d4d; }

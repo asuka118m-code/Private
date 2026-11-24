@@ -109,6 +109,7 @@ export function RecipeList() {
             🙋 リクエスト {openRequests > 0 && <span className="req-count">{openRequests}</span>}
           </button>
         )}
+        {sync.session && <Link to="/friends" className="chip friend-chip">👥 友だち</Link>}
         {sync.session && (inbox.length > 0 || showInbox) && (
           <button className={`chip inbox-chip ${showInbox ? "on" : ""}`} onClick={() => setView(showInbox ? null : "inbox")}>
             🔖 あとで登録 {openInbox > 0 && <span className="req-count inbox-count">{openInbox}</span>}
