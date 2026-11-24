@@ -36,8 +36,16 @@ export function RequestForm({ token, recipeId, recipeTitle, onSent, initialUrl =
       <input className="input" maxLength={500} value={text} onChange={(e) => { setText(e.target.value); setMsg(""); }}
         placeholder={recipeId ? "ひとこと（例：週末に食べたい！）※なくてもOK" : "食べたいもの（例：ハンバーグ、辛めのカレー）"} />
       {!recipeId && (
-        <input className="input" type="url" inputMode="url" maxLength={1000} value={url} onChange={(e) => { setUrl(e.target.value); setMsg(""); }}
-          placeholder="参考のURL（レシピサイト・Instagram・YouTubeなど）※なくてもOK" />
+        <div className="row">
+          <input className="input grow" type="url" inputMode="url" maxLength={1000} value={url} onChange={(e) => { setUrl(e.target.value); setMsg(""); }}
+            placeholder="参考のURL（Instagram・YouTubeなど）※なくてもOK" />
+          {navigator.clipboard?.readText && (
+            <button type="button" className="btn small nowrap" onClick={async () => {
+              try { const t = await navigator.clipboard.readText(); const u = t.match(/https?:\/\/[^\s"'<>]+/)?.[0]; if (u) setUrl(u); else setErr("コピーされた中にURLが見つかりませんでした"); }
+              catch { setErr("貼り付けが許可されませんでした。欄を長押しして「ペースト」してください"); }
+            }}>📋 貼り付け</button>
+          )}
+        </div>
       )}
       <button className="btn primary" disabled={busy || !name.trim() || (!recipeId && !text.trim() && !url.trim())} onClick={send}>
         {busy ? "送信中…" : recipeId ? "🙋 これ食べたい！" : "🙋 リクエストを送る"}

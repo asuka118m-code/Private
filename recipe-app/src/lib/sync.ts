@@ -1,6 +1,6 @@
 // クラウド同期（端末内のデータを正として、変更分だけをやり取りする）
 // ルール：同じレシピを2台で変更した場合は「後から変更した方」が残る
-import { CATEGORY_PREFIX, emitChange, getDb } from "./db";
+import { CATEGORY_PREFIX, emitChange, getDb, getImage, hasImage, storeImage } from "./db";
 import type { Category, Recipe } from "./types";
 
 export interface RemoteRow {
@@ -50,7 +50,7 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
   for (const r of changed) {
     for (const imgId of [...r.sourceImageIds, ...r.photoIds]) {
       if (await db.get("syncedImages", imgId)) continue;
-      const blob = (await db.get("images", imgId))?.blob;
+      const blob = await getImage(imgId);
       if (!blob) continue;
       await remote.uploadImage(imgId, blob);
       await db.put("syncedImages", { id: imgId });
@@ -110,10 +110,10 @@ export async function syncOnce(remote: Remote): Promise<SyncResult> {
     if (!local && (await db.get("tombstones", row.id))) continue; // この端末で削除済み
     const data = row.data as Recipe;
     for (const imgId of [...data.sourceImageIds, ...data.photoIds]) {
-      if (await db.get("images", imgId)) continue;
+      if (await hasImage(imgId)) continue;
       const blob = await remote.downloadImage(imgId);
       if (blob) {
-        await db.put("images", { id: imgId, blob });
+        await storeImage(imgId, blob);
         await db.put("syncedImages", { id: imgId });
       }
     }
