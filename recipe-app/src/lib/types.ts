@@ -41,6 +41,8 @@ export interface RecipeDraft {
   sourceUrl: string;
   sourceImages: Blob[];
   categoryIds?: string[];
+  memo?: string;
+  fromRequest?: { id: string; author: string }; // リクエストをOKして作る場合
 }
 
 export interface Category {

@@ -41,6 +41,7 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
                 <span>
                   {r.recipeId && titleOf(r.recipeId) ? <Link to={`/s/${token}/r/${r.recipeId}`} className="recipe-link">{titleOf(r.recipeId)}</Link> : null}
                   {r.recipeId && r.text ? "　" : ""}{r.text}
+                  {r.url && <a href={r.url} target="_blank" rel="noreferrer" className="ref-link">🔗 参考</a>}
                 </span>
                 <small>{fmt(r.createdAt)}</small>
               </li>

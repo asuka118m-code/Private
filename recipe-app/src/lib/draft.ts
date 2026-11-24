@@ -7,3 +7,11 @@ export const takeDraft = () => {
   pending = null;
   return d;
 };
+
+/** OKしたリクエスト（取り込み画面に渡す） */
+export interface PendingRequest { id: string; author: string; text: string; url?: string | null }
+let pendingRequest: PendingRequest | null = null;
+export const setPendingRequest = (r: PendingRequest) => void (pendingRequest = r);
+export const getPendingRequest = () => pendingRequest;
+export const clearPendingRequest = () => void (pendingRequest = null);
+export const requestMemo = (r: PendingRequest) => `🙋 ${r.author}さんのリクエスト${r.text ? `：${r.text}` : ""}`;

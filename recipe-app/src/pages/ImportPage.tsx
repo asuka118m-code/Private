@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { aiStatus, fetchRemoteImage, findUrl, importFromImages, importFromText, importFromUrl, type ImportResult } from "../lib/api";
-import { setDraft } from "../lib/draft";
+import { clearPendingRequest, getPendingRequest, requestMemo, setDraft } from "../lib/draft";
 import { getSelectedCategory, listCategories, saveDraftAsRecipe } from "../lib/db";
 import type { RecipeDraft } from "../lib/types";
 import { ImagePicker } from "../components/ImagePicker";
@@ -58,6 +58,28 @@ export function ImportPage() {
 
   useEffect(() => { aiStatus().then(setAi); }, []);
 
+  // 「OK、レシピにする」から来た場合：参考URLから自動で読み取る
+  const [req] = useState(() => (params.get("fromRequest") ? getPendingRequest() : null));
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!req?.url || autoRan.current) return;
+    autoRan.current = true;
+    setUrl(req.url);
+    setTab("url");
+    runUrl(req.url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [req]);
+
+  function manualFromRequest() {
+    if (!req) return;
+    setDraft({
+      title: req.text, servings: "", ingredients: [], steps: [], sourceUrl: req.url ?? "", sourceImages: [],
+      memo: requestMemo(req), fromRequest: { id: req.id, author: req.author },
+    });
+    clearPendingRequest();
+    nav("/new");
+  }
+
   // 共有シート / ?url= ?text= から来た場合
   useEffect(() => {
     (async () => {
@@ -80,7 +102,8 @@ export function ImportPage() {
     const categoryIds = sel && (await listCategories()).some((c) => c.id === sel) ? [sel] : [];
     const drafts: RecipeDraft[] = result.recipes.map((r) => ({
       categoryIds,
-      title: r.title || "",
+      title: r.title || req?.text || "",
+      ...(req ? { memo: requestMemo(req), fromRequest: { id: req.id, author: req.author } } : {}),
       servings: r.servings || "",
       ingredients: (r.ingredients ?? []).map((i) => (i.mark ? i : { name: i.name, amount: i.amount })),
       steps: r.steps ?? [],
@@ -88,8 +111,9 @@ export function ImportPage() {
       sourceImages: imgs,
     }));
     if (drafts.length === 0) throw new Error("レシピを読み取れませんでした。「材料」「作り方」の見出しがあるか確認してください。");
-    if (drafts.length === 1) {
+    if (drafts.length === 1 || req) {
       setDraft(drafts[0]);
+      clearPendingRequest();
       return nav("/new");
     }
     setPreview(drafts.map((d) => ({ ...d, checked: true })));
@@ -106,14 +130,25 @@ export function ImportPage() {
     }
   }
 
-  async function run() {
+  async function runUrl(raw: string) {
     setBusy(true);
     setError("");
     try {
-      if (tab === "url") {
-        const u = findUrl(url) || url.trim();
-        await finish(await importFromUrl(u), [], u);
-      } else if (tab === "image") {
+      const u = findUrl(raw) || raw.trim();
+      await finish(await importFromUrl(u), [], u);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function run() {
+    if (tab === "url") return runUrl(url);
+    setBusy(true);
+    setError("");
+    try {
+      if (tab === "image") {
         await finish(await importFromImages(images), images, "");
       } else {
         await finish(await importFromText(text, useAi ? "ai" : "rule"), [], "");
@@ -166,6 +201,12 @@ export function ImportPage() {
         <Link to="/" className="back">‹ 戻る</Link>
         <h1>レシピを追加</h1>
       </header>
+      {req && (
+        <div className="notice request-notice">
+          🙋 {req.author}さんのリクエスト{req.text ? `「${req.text}」` : ""}をレシピにします
+          {req.url ? "。参考URLから読み取っています…" : ""}
+        </div>
+      )}
 
       <div className="tabs">
         <button className={tab === "url" ? "on" : ""} onClick={() => setTab("url")}>🔗 URL</button>
@@ -217,6 +258,9 @@ export function ImportPage() {
         )}
 
         {error && <div className="error">{error}</div>}
+        {req && error && (
+          <button className="btn primary wide" onClick={manualFromRequest}>このまま手入力でレシピにする（URLは参考として保存）</button>
+        )}
         <button className="btn primary wide" disabled={!canRun || busy || (tab === "image" && ai === false)} onClick={run}>
           {busy ? "読み取り中…" : tab === "text" && !useAi ? "整えて取り込む" : "読み取る"}
         </button>

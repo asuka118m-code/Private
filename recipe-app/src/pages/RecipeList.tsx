@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { coverOf, getSelectedCategory, listCategories, listRecipes, onDataChange, setSelectedCategory } from "../lib/db";
 import { useSyncState } from "../lib/useSync";
 import type { Category, Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 import { cookedCount, daysSince, isCooked, lastCooked } from "../lib/cooked";
 import { ShareDialog } from "../components/ShareDialog";
-import { fetchRequests } from "../lib/share";
+import { fetchRequests, type FoodRequest } from "../lib/share";
+import { RequestBoard } from "../components/RequestBoard";
 
 type CookFilter = "all" | "cooked" | "notyet";
 type SortKey = "updated" | "recent" | "longago";
@@ -24,10 +25,14 @@ export function RecipeList() {
   const chooseSort = (v: SortKey) => { setSort(v); localStorage.setItem(SORT_KEY, v); };
   const sync = useSyncState();
   const [sharing, setSharing] = useState(false);
-  const [openRequests, setOpenRequests] = useState(0);
+  const [requests, setRequests] = useState<FoodRequest[]>([]);
+  const openRequests = requests.filter((x) => !x.done).length;
+  const [params, setParams] = useSearchParams();
+  const showRequests = params.get("view") === "requests";
+  const setShowRequests = (on: boolean) => setParams(on ? { view: "requests" } : {}, { replace: true });
   useEffect(() => {
     if (!sync.session) return;
-    const load = () => fetchRequests().then((r) => setOpenRequests(r.filter((x) => !x.done).length));
+    const load = () => fetchRequests().then(setRequests);
     load();
     const onVisible = () => document.visibilityState === "visible" && load();
     document.addEventListener("visibilitychange", onVisible);
@@ -73,22 +78,27 @@ export function RecipeList() {
       {sync.enabled && !sync.session && (
         <Link to="/settings" className="notice">ログインすると、iPhone・iPadなど複数の端末でレシピが同期されます ›</Link>
       )}
-      {openRequests > 0 && (
-        <Link to="/requests" className="notice request-notice">🙋 食べたいリクエストが{openRequests}件届いています ›</Link>
-      )}
-      {sync.session && openRequests === 0 && (
-        <Link to="/requests" className="req-link">🙋 リクエスト</Link>
+      {openRequests > 0 && !showRequests && (
+        <button className="notice request-notice" onClick={() => setShowRequests(true)}>🙋 食べたいリクエストが{openRequests}件届いています ›</button>
       )}
       <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
       <nav className="cat-bar">
-        <button className={`chip ${current === "" ? "on" : ""}`} onClick={() => select("")}>すべて <span>{recipes?.length ?? 0}</span></button>
+        <button className={`chip ${!showRequests && current === "" ? "on" : ""}`} onClick={() => { select(""); setShowRequests(false); }}>すべて <span>{recipes?.length ?? 0}</span></button>
         {categories.map((c) => (
-          <button key={c.id} className={`chip ${current === c.id ? "on" : ""}`} onClick={() => select(c.id)}>
+          <button key={c.id} className={`chip ${!showRequests && current === c.id ? "on" : ""}`} onClick={() => { select(c.id); setShowRequests(false); }}>
             {c.name} <span>{count(c.id)}</span>
           </button>
         ))}
+        {sync.session && (
+          <button className={`chip req-chip ${showRequests ? "on" : ""}`} onClick={() => setShowRequests(!showRequests)}>
+            🙋 リクエスト {openRequests > 0 && <span className="req-count">{openRequests}</span>}
+          </button>
+        )}
         <Link to="/categories" className="chip ghost">{categories.length ? "✎ カテゴリ編集" : "＋ カテゴリを作る"}</Link>
       </nav>
+      {showRequests ? (
+        <RequestBoard requests={requests} recipes={recipes ?? []} onChange={setRequests} />
+      ) : (<>
       {current && (
         <Link to={`/categories/${current}/select`} className="btn wide add-to-cat">＋ レシピを選んで「{categories.find((c) => c.id === current)?.name}」に追加</Link>
       )}
@@ -140,6 +150,7 @@ export function RecipeList() {
           );
         })}
       </ul>
+      </>)}
       <Link to="/import" className="fab" aria-label="レシピを追加">＋</Link>
       {sharing && <ShareDialog recipeId={null} title="レシピ一覧" onClose={() => setSharing(false)} />}
     </div>

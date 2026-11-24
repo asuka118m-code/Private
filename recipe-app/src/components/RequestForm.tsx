@@ -7,6 +7,7 @@ export function RequestForm({ token, recipeId, recipeTitle, onSent }: {
 }) {
   const [name, setName] = useState(getGuestName());
   const [text, setText] = useState("");
+  const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -14,8 +15,11 @@ export function RequestForm({ token, recipeId, recipeTitle, onSent }: {
   async function send() {
     setBusy(true); setErr(""); setMsg("");
     try {
-      const r = await addRequest(token, name.trim(), text.trim(), recipeId);
+      const link = url.trim();
+      if (link && !/^https?:\/\//.test(link)) throw new Error("URLは https:// から始まる形で貼ってください");
+      const r = await addRequest(token, name.trim(), text.trim(), recipeId, link || undefined);
       setText("");
+      setUrl("");
       setMsg(recipeTitle ? `「${recipeTitle}」をリクエストしました！` : "リクエストを送りました！");
       onSent?.(r);
     } catch (e) {
@@ -30,7 +34,11 @@ export function RequestForm({ token, recipeId, recipeTitle, onSent }: {
       <input className="input" placeholder="あなたの名前" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
       <input className="input" maxLength={500} value={text} onChange={(e) => { setText(e.target.value); setMsg(""); }}
         placeholder={recipeId ? "ひとこと（例：週末に食べたい！）※なくてもOK" : "食べたいもの（例：ハンバーグ、辛めのカレー）"} />
-      <button className="btn primary" disabled={busy || !name.trim() || (!recipeId && !text.trim())} onClick={send}>
+      {!recipeId && (
+        <input className="input" type="url" inputMode="url" maxLength={1000} value={url} onChange={(e) => { setUrl(e.target.value); setMsg(""); }}
+          placeholder="参考のURL（レシピサイト・Instagram・YouTubeなど）※なくてもOK" />
+      )}
+      <button className="btn primary" disabled={busy || !name.trim() || (!recipeId && !text.trim() && !url.trim())} onClick={send}>
         {busy ? "送信中…" : recipeId ? "🙋 これ食べたい！" : "🙋 リクエストを送る"}
       </button>
       {msg && <p className="hint">{msg}</p>}

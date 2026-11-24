@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { RecipeList } from "./pages/RecipeList";
 import { RecipeDetail } from "./pages/RecipeDetail";
 import { RecipeEdit } from "./pages/RecipeEdit";
@@ -10,7 +10,6 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { CategorySelectPage } from "./pages/CategorySelectPage";
 import { SharedRecipePage } from "./pages/SharedRecipePage";
 import { SharedEntryPage } from "./pages/SharedEntryPage";
-import { RequestsPage } from "./pages/RequestsPage";
 import "./styles.css";
 import { initSync } from "./lib/useSync";
 
@@ -33,7 +32,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/categories/:id/select" element={<CategorySelectPage />} />
         <Route path="/s/:token" element={<SharedEntryPage />} />
         <Route path="/s/:token/r/:recipeId" element={<SharedRecipePage />} />
-        <Route path="/requests" element={<RequestsPage />} />
+        <Route path="/requests" element={<Navigate to="/?view=requests" replace />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

@@ -9,10 +9,13 @@ create table if not exists public.requests (
   id uuid primary key default gen_random_uuid(),
   token text not null references public.shares (token) on delete cascade,
   user_id uuid not null references auth.users on delete cascade,  -- 作る人（レシピの持ち主）
-  recipe_id text,                                                -- レシピを選んだ場合
+  recipe_id text,                                                -- 今あるレシピを選んだ場合
   author text not null check (char_length(author) between 1 and 40),
   text text not null default '' check (char_length(text) <= 500),
-  done boolean not null default false,
+  url text check (url is null or (char_length(url) <= 1000 and url ~ '^https?://')),  -- 参考のページ・動画
+  done boolean not null default false,                           -- 作った・レシピにした・見送った
+  accepted_recipe_id text,                                       -- OKしてレシピにした時のレシピ
+
   created_at timestamptz not null default now()
 );
 create index if not exists requests_user on public.requests (user_id, done, created_at);
@@ -53,7 +56,7 @@ language sql stable security definer set search_path = '' as $$
       from public.recipes r
       where r.user_id = s.user_id and not r.deleted and r.id like 'cat:%'), '[]'::jsonb),
     'requests', coalesce((
-      select jsonb_agg(jsonb_build_object('id', q.id, 'author', q.author, 'text', q.text, 'recipeId', q.recipe_id,
+      select jsonb_agg(jsonb_build_object('id', q.id, 'author', q.author, 'text', q.text, 'recipeId', q.recipe_id, 'url', q.url,
         'createdAt', (extract(epoch from q.created_at) * 1000)::bigint) order by q.created_at desc)
       from public.requests q
       where q.user_id = s.user_id and not q.done), '[]'::jsonb))
@@ -104,25 +107,27 @@ begin
     'createdAt', (extract(epoch from c.created_at) * 1000)::bigint);
 end $$;
 
--- ⑥ 「食べたい」リクエストを送る
-create or replace function public.add_request(p_token text, p_author text, p_text text, p_recipe_id text)
+-- ⑥ 「食べたい」リクエストを送る（今あるレシピを選ぶ／食べたいものを書く・参考URLを付ける）
+create or replace function public.add_request(p_token text, p_author text, p_text text, p_recipe_id text, p_url text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   s public.shares;
   q public.requests;
   rid text := nullif(p_recipe_id, '');
+  link text := nullif(trim(coalesce(p_url, '')), '');
 begin
   select * into s from public.shares where token = p_token and not revoked;
   if not found then raise exception 'この共有リンクは使えません'; end if;
   if rid is not null and not public.share_allows(s, rid) then raise exception 'このレシピはリクエストできません'; end if;
-  if rid is null and coalesce(trim(p_text), '') = '' then raise exception '食べたいものを書いてください'; end if;
+  if link is not null and (link !~ '^https?://' or char_length(link) > 1000) then raise exception 'URLが正しくありません'; end if;
+  if rid is null and link is null and coalesce(trim(p_text), '') = '' then raise exception '食べたいものを書くか、URLを貼ってください'; end if;
   if (select count(*) from public.requests x where x.token = p_token and x.created_at > now() - interval '1 hour') >= 30 then
     raise exception 'リクエストが多すぎます。しばらくしてからお試しください';
   end if;
-  insert into public.requests (token, user_id, recipe_id, author, text)
-  values (p_token, s.user_id, rid, left(trim(p_author), 40), left(coalesce(trim(p_text), ''), 500))
+  insert into public.requests (token, user_id, recipe_id, author, text, url)
+  values (p_token, s.user_id, rid, left(trim(p_author), 40), left(coalesce(trim(p_text), ''), 500), link)
   returning * into q;
-  return jsonb_build_object('id', q.id, 'author', q.author, 'text', q.text, 'recipeId', q.recipe_id,
+  return jsonb_build_object('id', q.id, 'author', q.author, 'text', q.text, 'recipeId', q.recipe_id, 'url', q.url,
     'createdAt', (extract(epoch from q.created_at) * 1000)::bigint);
 end $$;
 
@@ -142,9 +147,9 @@ revoke all on function public.share_allows(public.shares, text) from public;
 revoke all on function public.get_shared_list(text) from public;
 revoke all on function public.get_shared_recipe(text, text) from public;
 revoke all on function public.add_shared_comment(text, text, text, int, text) from public;
-revoke all on function public.add_request(text, text, text, text) from public;
+revoke all on function public.add_request(text, text, text, text, text) from public;
 grant execute on function public.get_shared_list(text) to anon, authenticated;
 grant execute on function public.get_shared_recipe(text, text) to anon, authenticated;
 grant execute on function public.add_shared_comment(text, text, text, int, text) to anon, authenticated;
-grant execute on function public.add_request(text, text, text, text) to anon, authenticated;
+grant execute on function public.add_request(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.is_shared_image(text) to anon, authenticated;

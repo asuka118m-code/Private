@@ -8,6 +8,7 @@ import { StoredImage } from "../components/StoredImage";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { RecipePicker } from "../components/RecipePicker";
 import { MARK_CHOICES } from "../../shared/textparse.mjs";
+import { acceptRequest } from "../lib/share";
 import { markColor } from "../components/Mark";
 
 /** 保存済み(id) or 未保存(blob) の画像 */
@@ -35,6 +36,7 @@ export function RecipeEdit() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [memo, setMemo] = useState("");
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [fromRequest, setFromRequest] = useState<{ id: string; author: string } | null>(null);
   const [sourceImgs, setSourceImgs] = useState<Img[]>([]);
   const [photos, setPhotos] = useState<Img[]>([]);
   const [cover, setCover] = useState<string | undefined>(); // Img.key
@@ -72,6 +74,8 @@ export function RecipeEdit() {
           if (d.ingredients.length) setIngredients(d.ingredients);
           if (d.steps.length) setSteps(d.steps);
           setSourceUrl(d.sourceUrl);
+          if (d.memo) setMemo(d.memo);
+          if (d.fromRequest) setFromRequest(d.fromRequest);
           setSourceImgs(d.sourceImages.map(fromBlob));
         }
       }
@@ -116,6 +120,8 @@ export function RecipeEdit() {
         createdAt: base?.createdAt ?? now,
         updatedAt: now,
       });
+      // リクエストをOKして作ったレシピなら、リクエストを「レシピにした」にする
+      if (fromRequest) await acceptRequest(fromRequest.id, r.id).catch(() => {});
       nav(`/recipe/${r.id}`, { replace: true });
     } finally {
       setSaving(false);
@@ -151,6 +157,7 @@ export function RecipeEdit() {
         </section>
       )}
 
+      {fromRequest && <div className="notice request-notice">🙋 {fromRequest.author}さんのリクエストから作るレシピです。保存すると、あなたのレシピ一覧に加わります。</div>}
       <section className="panel">
         <label className="field">タイトル<input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：豚バラ大根" /></label>
         <label className="field">分量（何人分・何個分）<input className="input" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="例：2人分、12個分" /></label>

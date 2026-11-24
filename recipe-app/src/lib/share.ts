@@ -107,7 +107,13 @@ export async function loadSharedImage(ownerId: string, imageId: string): Promise
 
 // ---- 一覧の共有・「食べたい」リクエスト ----
 export interface SharedListItem { id: string; title: string; servings: string; cover: string | null; categoryIds: string[]; cookedCount: number; updatedAt: number }
-export interface FoodRequest { id: string; author: string; text: string; recipeId: string | null; createdAt: number; done?: boolean }
+export interface FoodRequest {
+  id: string; author: string; text: string;
+  recipeId: string | null; // 今あるレシピへの「これ食べたい」
+  url?: string | null; // 参考のページ・動画
+  createdAt: number; done?: boolean;
+  acceptedRecipeId?: string | null; // OKしてレシピにした時のレシピ
+}
 export interface SharedList {
   ownerId: string; ownerName: string;
   recipes: SharedListItem[];
@@ -123,9 +129,9 @@ export async function getSharedList(token: string): Promise<SharedList | null> {
   return (data as SharedList) ?? null;
 }
 
-export async function addRequest(token: string, author: string, text: string, recipeId?: string | null): Promise<FoodRequest> {
-  const { data, error } = await need().rpc("add_request", { p_token: token, p_author: author, p_text: text, p_recipe_id: recipeId ?? null });
-  if (error) throw new Error(/できません|書いて|多すぎ|使えません/.test(error.message) ? error.message : `送信できませんでした：${error.message}`);
+export async function addRequest(token: string, author: string, text: string, recipeId?: string | null, url?: string): Promise<FoodRequest> {
+  const { data, error } = await need().rpc("add_request", { p_token: token, p_author: author, p_text: text, p_recipe_id: recipeId ?? null, p_url: url || null });
+  if (error) throw new Error(/できません|書|貼って|多すぎ|使えません|正しく/.test(error.message) ? error.message : `送信できませんでした：${error.message}`);
   setGuestName(author);
   return data as FoodRequest;
 }
@@ -133,12 +139,20 @@ export async function addRequest(token: string, author: string, text: string, re
 /** 持ち主：届いているリクエスト */
 export async function fetchRequests(): Promise<FoodRequest[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from("requests").select("id, author, text, recipe_id, done, created_at").order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("requests").select("id, author, text, recipe_id, url, done, accepted_recipe_id, created_at").order("created_at", { ascending: false });
   if (error) return [];
-  return data.map((q) => ({ id: q.id, author: q.author, text: q.text, recipeId: q.recipe_id, done: q.done, createdAt: Date.parse(q.created_at) }));
+  return data.map((q) => ({
+    id: q.id, author: q.author, text: q.text, recipeId: q.recipe_id, url: q.url, done: q.done,
+    acceptedRecipeId: q.accepted_recipe_id, createdAt: Date.parse(q.created_at),
+  }));
 }
 export async function setRequestDone(id: string, done: boolean) {
   const { error } = await need().from("requests").update({ done }).eq("id", id);
+  msg(error, "更新できませんでした");
+}
+/** OKしてレシピにした */
+export async function acceptRequest(id: string, recipeId: string) {
+  const { error } = await need().from("requests").update({ done: true, accepted_recipe_id: recipeId }).eq("id", id);
   msg(error, "更新できませんでした");
 }
 export async function deleteRequest(id: string) {
