@@ -4,7 +4,9 @@ import { syncNow, useSyncState } from "../lib/useSync";
 import { Link } from "react-router-dom";
 
 /** レシピの共有リンクを作る・送る・止める */
-export function ShareDialog({ recipeId, title, onClose }: { recipeId: string; title: string; onClose: () => void }) {
+/** recipeId が null なら「全レシピ一覧」の共有 */
+export function ShareDialog({ recipeId, title, onClose }: { recipeId: string | null; title: string; onClose: () => void }) {
+  const isList = recipeId === null;
   const sync = useSyncState();
   const [share, setShare] = useState<ShareInfo | null | undefined>(undefined);
   const [name, setName] = useState(getOwnerName());
@@ -31,7 +33,9 @@ export function ShareDialog({ recipeId, title, onClose }: { recipeId: string; ti
   async function send() {
     if (!share) return;
     const url = shareUrl(share.token);
-    const text = `「${title}」のレシピです。作って食べた感想をコメントしてね`;
+    const text = isList
+      ? "あじめものレシピ一覧です。食べた感想や「これ食べたい！」を送ってね"
+      : `「${title}」のレシピです。作って食べた感想をコメントしてね`;
     if (navigator.share) {
       try { await navigator.share({ title, text, url }); return; } catch (e) { if ((e as Error).name === "AbortError") return; }
     }
@@ -43,14 +47,18 @@ export function ShareDialog({ recipeId, title, onClose }: { recipeId: string; ti
     <div className="modal-back" onClick={onClose}>
       <div className="modal share-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>「{title}」を共有</h2>
+          <h2>{isList ? "レシピ一覧をみんなに見せる" : `「${title}」を共有`}</h2>
           <button type="button" className="link" onClick={onClose}>閉じる</button>
         </div>
         {!sync.enabled ? <p className="hint">共有にはクラウドの設定が必要です。</p> :
           !sync.session ? <p className="hint">共有するにはログインしてください。<Link to="/settings" className="link">ログインへ</Link></p> :
           share === undefined ? <p className="hint">確認中…</p> : (
           <>
-            <p className="hint">リンクを送った相手は、ログインなしでこのレシピを見て、感想をコメントできます。届いたコメントは、このレシピの「感想・コメント」に表示されます。</p>
+            <p className="hint">
+              {isList
+                ? "リンクを送った相手は、ログインなしで全部のレシピを見て、コメント・★評価と「食べたい」リクエストを送れます（編集はできません）。届いたものは、各レシピの「感想・コメント」と一覧の「リクエスト」に表示されます。"
+                : "リンクを送った相手は、ログインなしでこのレシピを見て、感想をコメントできます。届いたコメントは、このレシピの「感想・コメント」に表示されます。"}
+            </p>
             <label className="field">相手に表示するあなたの名前
               <input className="input" value={name} maxLength={40} placeholder="例：あすか" onChange={(e) => setName(e.target.value)}
                 onBlur={() => share && name.trim() && name.trim() !== share.ownerName && run(async () => { await updateShareName(share.token, name.trim()); setShare({ ...share, ownerName: name.trim() }); })} />
@@ -64,7 +72,7 @@ export function ShareDialog({ recipeId, title, onClose }: { recipeId: string; ti
                     run(async () => { await revokeShare(share.token); setShare(null); setMsg("共有を止めました"); })}>共有を止める</button>
               </>
             ) : (
-              <button className="btn primary wide" disabled={busy || !name.trim()} onClick={create}>{busy ? "作成中…" : "共有リンクを作る"}</button>
+              <button className="btn primary wide" disabled={busy || !name.trim()} onClick={create}>{busy ? "作成中…" : isList ? "一覧の共有リンクを作る" : "共有リンクを作る"}</button>
             )}
           </>
         )}

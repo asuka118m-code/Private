@@ -5,6 +5,8 @@ import { useSyncState } from "../lib/useSync";
 import type { Category, Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 import { cookedCount, daysSince, isCooked, lastCooked } from "../lib/cooked";
+import { ShareDialog } from "../components/ShareDialog";
+import { fetchRequests } from "../lib/share";
 
 type CookFilter = "all" | "cooked" | "notyet";
 type SortKey = "updated" | "recent" | "longago";
@@ -21,6 +23,16 @@ export function RecipeList() {
   const chooseCook = (v: CookFilter) => { setCook(v); localStorage.setItem(FILTER_KEY, v); };
   const chooseSort = (v: SortKey) => { setSort(v); localStorage.setItem(SORT_KEY, v); };
   const sync = useSyncState();
+  const [sharing, setSharing] = useState(false);
+  const [openRequests, setOpenRequests] = useState(0);
+  useEffect(() => {
+    if (!sync.session) return;
+    const load = () => fetchRequests().then((r) => setOpenRequests(r.filter((x) => !x.done).length));
+    load();
+    const onVisible = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [sync.session]);
   useEffect(() => {
     const load = () => { listRecipes().then(setRecipes); listCategories().then(setCategories); };
     load();
@@ -53,12 +65,19 @@ export function RecipeList() {
     <div className="page">
       <header className="topbar">
         <h1>あじめも</h1>
+        {sync.session && <button className="btn small" onClick={() => setSharing(true)}>みんなに見せる</button>}
         <Link to="/settings" className="btn small">
           {!sync.enabled ? "設定" : !sync.session ? "ログイン" : sync.status === "syncing" ? "同期中…" : sync.status === "error" ? "⚠ 同期エラー" : "☁ 同期済み"}
         </Link>
       </header>
       {sync.enabled && !sync.session && (
         <Link to="/settings" className="notice">ログインすると、iPhone・iPadなど複数の端末でレシピが同期されます ›</Link>
+      )}
+      {openRequests > 0 && (
+        <Link to="/requests" className="notice request-notice">🙋 食べたいリクエストが{openRequests}件届いています ›</Link>
+      )}
+      {sync.session && openRequests === 0 && (
+        <Link to="/requests" className="req-link">🙋 リクエスト</Link>
       )}
       <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
       <nav className="cat-bar">
@@ -122,6 +141,7 @@ export function RecipeList() {
         })}
       </ul>
       <Link to="/import" className="fab" aria-label="レシピを追加">＋</Link>
+      {sharing && <ShareDialog recipeId={null} title="レシピ一覧" onClose={() => setSharing(false)} />}
     </div>
   );
 }
