@@ -55,12 +55,12 @@ export function ImportPage() {
   const [ai, setAi] = useState<boolean | null>(null);
   const [useAi, setUseAi] = useState(false);
   const [preview, setPreview] = useState<(RecipeDraft & { checked: boolean })[] | null>(null);
+  const autoRan = useRef(false);
 
   useEffect(() => { aiStatus().then(setAi); }, []);
 
   // 「OK、レシピにする」から来た場合：参考URLから自動で読み取る
   const [req] = useState(() => (params.get("fromRequest") ? getPendingRequest() : null));
-  const autoRan = useRef(false);
   useEffect(() => {
     if (!req?.url || autoRan.current) return;
     autoRan.current = true;
@@ -87,7 +87,11 @@ export function ImportPage() {
       const sUrl = shared?.url || params.get("url") || findUrl(shared?.text || params.get("text") || "");
       const sText = [shared?.title, shared?.text || params.get("text")].filter(Boolean).join("\n");
       if (shared?.files.length) { setImages(shared.files); setTab("image"); }
-      else if (sUrl) { setUrl(sUrl); setTab("url"); }
+      else if (sUrl) {
+        setUrl(sUrl); setTab("url");
+        // ショートカット・共有から来た時は、自動で読み取りを始める
+        if ((params.get("auto") || shared) && !autoRan.current) { autoRan.current = true; runUrl(sUrl); }
+      }
       else if (sText) { setText(sText); setTab("text"); }
     })();
   }, [params]);
@@ -261,6 +265,12 @@ export function ImportPage() {
         {req && error && (
           <button className="btn primary wide" onClick={manualFromRequest}>このまま手入力でレシピにする（URLは参考として保存）</button>
         )}
+        {!req && error && tab === "url" && url.trim() && (
+          <button className="btn wide" onClick={() => {
+            setDraft({ title: "", servings: "", ingredients: [], steps: [], sourceUrl: findUrl(url) || url.trim(), sourceImages: [] });
+            nav("/new");
+          }}>このURLを参考にして手入力で作る</button>
+        )}
         <button className="btn primary wide" disabled={!canRun || busy || (tab === "image" && ai === false)} onClick={run}>
           {busy ? "読み取り中…" : tab === "text" && !useAi ? "整えて取り込む" : "読み取る"}
         </button>
@@ -274,7 +284,7 @@ export function ImportPage() {
       </div>
       <p className="hint small">
         ヒント：Androidではホーム画面に追加すると、Instagramなどの「共有」からこのアプリへ直接送れます。
-        iPhoneでは共有メニューから「リンクをコピー」して貼り付けてください。
+        iPhone・iPadでは「ショートカット」アプリで「あじめもに追加」を作ると、共有メニューから送れます（設定画面に作り方があります）。
       </p>
     </div>
   );

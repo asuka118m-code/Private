@@ -116,6 +116,7 @@ export function SettingsPage() {
         <h1>設定</h1>
       </header>
       <AccountSection />
+      <ShortcutSection />
       <section className="panel">
         <h2>バックアップの書き出し</h2>
         <p className="hint">全レシピ・画像・コメントを1つのファイルに保存します。iPhone/iPadでは「"ファイル"に保存」からiCloud Driveに保存しておくと安心です。</p>
@@ -130,5 +131,30 @@ export function SettingsPage() {
       </section>
       {msg && <div className="panel"><p className="pre">{msg}</p></div>}
     </div>
+  );
+}
+
+/** iPhone・iPad の共有メニューから送るための「ショートカット」の作り方 */
+function ShortcutSection() {
+  const base = `${location.origin}/import?auto=1&url=`;
+  const [copied, setCopied] = useState(false);
+  return (
+    <section className="panel">
+      <h2>iPhone・iPadの共有メニューから送る</h2>
+      <p className="hint">「ショートカット」アプリで一度だけ作ると、Instagramやレシピサイトの共有ボタンに「あじめもに追加」が出ます。</p>
+      <ol className="howto">
+        <li>「ショートカット」アプリを開き、右上の「＋」で新しいショートカットを作る</li>
+        <li>名前を「あじめもに追加」にする（上の名前の部分をタップ）</li>
+        <li>下の検索で「<b>URLをエンコード</b>」を追加する</li>
+        <li>続けて「<b>テキスト</b>」を追加し、下の文字を貼り付けてから、その後ろに「URLエンコードされたテキスト」（変数）を入れる
+          <div className="share-url">{base}</div>
+          <button className="btn small" onClick={async () => { await navigator.clipboard?.writeText(base); setCopied(true); }}>{copied ? "コピーしました" : "この文字をコピー"}</button>
+        </li>
+        <li>続けて「<b>URLを開く</b>」を追加する（入力は「テキスト」）</li>
+        <li>下の「ⓘ（詳細）」で「<b>共有シートに表示</b>」をオンにし、受け取る種類を「URL」と「テキスト」にする</li>
+        <li>「URLをエンコード」の入力が「<b>ショートカットの入力</b>」になっていることを確認して完了</li>
+      </ol>
+      <p className="hint small">送るとSafariで開きます。Safariでもログインしておくと、読み取ったレシピが同期され、ホーム画面のアプリにも入ります。</p>
+    </section>
   );
 }

@@ -229,3 +229,5 @@ button.notice { width: 100%; text-align: left; border: 0; font: inherit; cursor:
 .req-card .ref-link { margin-left: 0; }
 .req-actions-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 .req-status { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.howto { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.6; }
+.howto .share-url { margin: 6px 0; }

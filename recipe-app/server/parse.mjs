@@ -43,6 +43,7 @@ export function parseRecipeHtml(html, baseUrl) {
   });
   const ogImage = $('meta[property="og:image"]').attr("content") || "";
   const ogTitle = $('meta[property="og:title"]').attr("content") || $("title").text() || "";
+  const description = $('meta[property="og:description"]').attr("content") || $('meta[name="description"]').attr("content") || "";
   const abs = (u) => { try { return u ? new URL(u, baseUrl).href : ""; } catch { return ""; } };
   if (recipe) {
     return {
@@ -58,7 +59,18 @@ export function parseRecipeHtml(html, baseUrl) {
   return {
     found: false,
     title: ogTitle.trim(),
+    description: snsCaption(description),
     imageUrl: abs(ogImage),
     pageText: $("body").text().replace(/\s+\n/g, "\n").replace(/[ \t]+/g, " ").slice(0, 30000),
   };
+}
+
+/**
+ * SNSの説明文から投稿本文だけを取り出す。
+ * Instagram: 「123 likes, 4 comments - user on November 1, 2026: "本文…"」→「本文…」
+ */
+export function snsCaption(desc) {
+  const s = String(desc || "").trim();
+  const m = s.match(/^[\s\S]*?(?:likes?|いいね)[\s\S]*?[-–]\s*[^:：]+?(?:on|、)[^:：]*[:：]\s*["“「]([\s\S]*)["”」]\.?\s*$/i);
+  return (m ? m[1] : s).replace(/\\n/g, "\n").trim();
 }
