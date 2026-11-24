@@ -234,3 +234,9 @@ button.notice { width: 100%; text-align: left; border: 0; font: inherit; cursor:
 .howto-box { background: #fff; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .requests-panel > .link.small { text-align: left; }
 .paste-btn { margin-bottom: 0; }
+/* あとで登録 */
+.inbox-chip { border-color: #e7cf8d; color: #8a6a12; background: #fffaeb; }
+.inbox-chip.on { background: #b7891a; border-color: #b7891a; color: #fff; }
+.inbox-count { background: #b7891a !important; }
+.inbox-notice { background: #fff6dc; color: #8a6a12; font-weight: 600; }
+.inbox-card { border-top-color: #e0b43c; }

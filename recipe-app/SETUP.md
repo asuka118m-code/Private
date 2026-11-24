@@ -36,6 +36,10 @@ SQL Editor で新しい入力欄を開き、`supabase/002_share.sql` の中身�
 
 SQL Editor で新しい入力欄を開き、`supabase/003_list_and_requests.sql` の中身を全部貼り付けて **Run** を押す（1回だけ）。
 
+### 1-追加3. あとで登録ボックス用の設定
+
+SQL Editor で `supabase/004_inbox.sql` の中身を全部貼り付けて **Run**（1回だけ）。
+
 ## 2. Anthropic（スクショ読み取りのAI）
 
 AIを使わない場合（テキスト貼り付けだけで使う場合）はこの手順を飛ばしてOKです。

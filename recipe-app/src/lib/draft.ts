@@ -9,9 +9,10 @@ export const takeDraft = () => {
 };
 
 /** OKしたリクエスト（取り込み画面に渡す） */
-export interface PendingRequest { id: string; author: string; text: string; url?: string | null }
+export interface PendingRequest { id: string; author: string; text: string; url?: string | null; kind?: "request" | "inbox" }
 let pendingRequest: PendingRequest | null = null;
 export const setPendingRequest = (r: PendingRequest) => void (pendingRequest = r);
 export const getPendingRequest = () => pendingRequest;
 export const clearPendingRequest = () => void (pendingRequest = null);
-export const requestMemo = (r: PendingRequest) => `🙋 ${r.author}さんのリクエスト${r.text ? `：${r.text}` : ""}`;
+export const requestMemo = (r: PendingRequest) =>
+  r.kind === "inbox" ? (r.text ? `🔖 ${r.text}` : "") : `🙋 ${r.author}さんのリクエスト${r.text ? `：${r.text}` : ""}`;

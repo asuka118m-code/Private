@@ -26,14 +26,14 @@ export function RequestBoard({ requests, recipes, onChange }: {
   };
 
   function accept(r: FoodRequest) {
-    const pending = { id: r.id, author: r.author, text: r.text, url: r.url };
+    const pending = { id: r.id, author: r.author, text: r.text, url: r.url, kind: "request" as const };
     if (r.url) {
       setPendingRequest(pending); // 取り込み画面でURLから読み取る
       nav("/import?fromRequest=1");
     } else {
       setDraft({
         title: r.text, servings: "", ingredients: [], steps: [], sourceUrl: "", sourceImages: [],
-        memo: requestMemo(pending), fromRequest: { id: r.id, author: r.author },
+        memo: requestMemo(pending), fromRequest: { id: r.id, author: r.author, kind: "request" },
       });
       nav("/new");
     }

@@ -159,3 +159,53 @@ export async function deleteRequest(id: string) {
   const { error } = await need().from("requests").delete().eq("id", id);
   msg(error, "削除できませんでした");
 }
+
+// ---- あとで登録ボックス（自分専用・ログインなしでURLを保存） ----
+export const INBOX = "__inbox__";
+export interface InboxItem { id: string; url: string | null; text: string; createdAt: number; done?: boolean; acceptedRecipeId?: string | null }
+
+export const inboxUrl = (token: string) => `${location.origin}/inbox/${token}?url=`;
+
+export async function getInboxLink(): Promise<string | null> {
+  return (await getActiveShare(INBOX))?.token ?? null;
+}
+export async function createInboxLink(): Promise<string> {
+  const token = newToken();
+  const { error } = await need().from("shares").insert({ token, recipe_id: INBOX, owner_name: "" });
+  msg(error, "ボックスを作れませんでした");
+  return token;
+}
+/** 作り直す（前のリンクは使えなくなる） */
+export async function resetInboxLink(old: string): Promise<string> {
+  await revokeShare(old);
+  return createInboxLink();
+}
+
+/** ショートカットから：ボックスに保存（ログイン不要） */
+export async function addInbox(token: string, url: string, text = ""): Promise<InboxItem> {
+  const { data, error } = await need().rpc("add_inbox", { p_token: token, p_url: url || null, p_text: text });
+  if (error) {
+    if (/add_inbox|schema cache|does not exist/i.test(error.message)) throw new Error("ボックスの準備ができていません（Supabaseで 004_inbox.sql を実行してください）");
+    throw new Error(/使えません|正しく|ありません|多すぎ/.test(error.message) ? error.message : `保存できませんでした：${error.message}`);
+  }
+  return data as InboxItem;
+}
+
+export async function fetchInbox(): Promise<InboxItem[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("inbox").select("id, url, text, done, accepted_recipe_id, created_at").order("created_at", { ascending: false });
+  if (error) return [];
+  return data.map((i) => ({ id: i.id, url: i.url, text: i.text, done: i.done, acceptedRecipeId: i.accepted_recipe_id, createdAt: Date.parse(i.created_at) }));
+}
+export async function setInboxDone(id: string, done: boolean) {
+  const { error } = await need().from("inbox").update({ done }).eq("id", id);
+  msg(error, "更新できませんでした");
+}
+export async function acceptInbox(id: string, recipeId: string) {
+  const { error } = await need().from("inbox").update({ done: true, accepted_recipe_id: recipeId }).eq("id", id);
+  msg(error, "更新できませんでした");
+}
+export async function deleteInbox(id: string) {
+  const { error } = await need().from("inbox").delete().eq("id", id);
+  msg(error, "削除できませんでした");
+}
