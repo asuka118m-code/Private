@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { addSharedComment, getGuestName, getSharedRecipe, type SharedRecipe } from "../lib/share";
 import { SharedImage } from "../components/SharedImage";
 import { RequestForm } from "../components/RequestForm";
-import { GuestNameBadge, GuestNameField } from "../components/GuestName";
+import { GuestNameField } from "../components/GuestName";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { CommentList } from "../components/CommentList";
 import { StepText } from "./RecipeDetail";
@@ -59,7 +59,6 @@ export function SharedRecipePage() {
         ) : (
           <><img src="/icons-v2/icon-192.png" alt="" /><span>{data.ownerName ? `${data.ownerName}さんから届いたレシピ` : "共有されたレシピ"}</span></>
         )}
-        <GuestNameBadge />
       </header>
       {cover && <SharedImage ownerId={data.ownerId} id={cover} className="hero" onClick={() => setZoom(cover)} />}
       <h1 className="recipe-title">{r.title}</h1>
