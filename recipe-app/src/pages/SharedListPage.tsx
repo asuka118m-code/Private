@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { SharedList } from "../lib/share";
 import { SharedImage } from "../components/SharedImage";
 import { RequestForm } from "../components/RequestForm";
+import { useSyncState } from "../lib/useSync";
+import { addTarget, listTargets } from "../lib/profile";
 
 const fmt = (t: number) => new Date(t).toLocaleDateString("ja-JP", { month: "short", day: "numeric" });
 
@@ -18,6 +20,12 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
   const [howto, setHowto] = useState(false);
   const [copied, setCopied] = useState(false);
   const shortcutBase = `${location.origin}/s/${token}?url=`;
+  // ログインしている人：このリンクを「リクエスト先」に登録できる
+  const sync = useSyncState();
+  const isOther = !!sync.session && sync.session.user.id !== data.ownerId;
+  const [targeted, setTargeted] = useState<boolean | null>(null);
+  const [targetMsg, setTargetMsg] = useState("");
+  useEffect(() => { if (isOther) listTargets().then((t) => setTargeted(t.some((x) => x.token === token))); }, [isOther, token]);
   const titleOf = (id: string | null) => data.recipes.find((r) => r.id === id)?.title;
   const cats = data.categories.filter((c) => data.recipes.some((r) => r.categoryIds.includes(c.id)));
 
@@ -36,6 +44,13 @@ export function SharedListPage({ token, list }: { token: string; list: SharedLis
         <span>{data.ownerName ? `${data.ownerName}さんのレシピ` : "あじめも"}</span>
       </header>
       <p className="hint">レシピを開いて、食べた感想や★を送れます。食べたいものがあればリクエストしてね。</p>
+      {isOther && targeted === false && (
+        <button className="notice target-btn" onClick={async () => {
+          try { await addTarget(token, data.ownerName || "相手"); setTargeted(true); setTargetMsg("リクエスト先に登録しました。ショートカットから「" + (data.ownerName || "相手") + "さんにリクエスト」を選べます"); }
+          catch (e) { setTargetMsg((e as Error).message); }
+        }}>📌 {data.ownerName || "この人"}さんをリクエスト先に登録（ショートカットから送れるように）</button>
+      )}
+      {targetMsg && <p className="hint small">{targetMsg}</p>}
 
       <section className="panel requests-panel">
         <h2>🙋 食べたいリクエスト</h2>

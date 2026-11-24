@@ -10,26 +10,34 @@ app.use(express.json({ limit: "25mb" }));
 const errMsg = (e) => (e instanceof Error ? e.message : String(e));
 
 // --- ログイン確認 ---------------------------------------------------------
-// Supabaseが設定されていれば、ログイン済みの人だけがAPI（AI読み取り等）を使える。
-// ALLOWED_EMAILS（カンマ区切り）を設定すると、さらに利用者を限定できる。
+// Supabaseが設定されていれば、ログイン済みの人だけがAPI（URL読み取り等）を使える。
+// ALLOWED_EMAILS（カンマ区切り）に入っている人だけが、AI（費用がかかる）を使える。
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } }) : null;
 const allowed = (process.env.ALLOWED_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
-async function requireUser(req, res, next) {
-  if (!supabase) return next(); // 認証なしモード（ローカル開発）
+async function userFrom(req) {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ error: "ログインしてください" });
+  if (!supabase || !token) return null;
   const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) return res.status(401).json({ error: "ログインの有効期限が切れました。もう一度ログインしてください" });
-  if (allowed.length && !allowed.includes((data.user.email || "").toLowerCase())) {
-    return res.status(403).json({ error: "このアカウントでは利用できません" });
-  }
+  return error ? null : data.user;
+}
+const aiAllowedFor = (user) => aiAvailable() && (!allowed.length || allowed.includes((user?.email || "").toLowerCase()));
+
+async function requireUser(req, res, next) {
+  if (!supabase) { req.aiAllowed = aiAvailable(); return next(); } // 認証なしモード（ローカル開発）
+  if (!req.headers.authorization) return res.status(401).json({ error: "ログインしてください" });
+  const user = await userFrom(req);
+  if (!user) return res.status(401).json({ error: "ログインの有効期限が切れました。もう一度ログインしてください" });
+  req.aiAllowed = aiAllowedFor(user);
   next();
 }
 
-app.get("/api/status", (_req, res) => res.json({ ai: aiAvailable() }));
+app.get("/api/status", async (req, res) => {
+  if (!supabase) return res.json({ ai: aiAvailable() });
+  res.json({ ai: aiAllowedFor(await userFrom(req)) });
+});
 
 app.use("/api/import", requireUser);
 app.use("/api/image", requireUser);
@@ -62,7 +70,7 @@ app.post("/api/import/url", async (req, res) => {
     }
     // 投稿の説明文（SNSのキャプションなど）＋ページ本文から探す
     const text = [parsed.description, parsed.pageText].filter(Boolean).join("\n\n");
-    if (aiAvailable() && text) {
+    if (req.aiAllowed && text) {
       const recipes = await extractWithClaude({ text });
       return res.json({ recipes: recipes.slice(0, 1), imageUrl: parsed.imageUrl, method: "ai" });
     }
@@ -79,7 +87,7 @@ app.post("/api/import/url", async (req, res) => {
 app.post("/api/import/text", async (req, res) => {
   const { text } = req.body ?? {};
   if (!text?.trim()) return res.status(400).json({ error: "テキストが空です" });
-  if (!aiAvailable()) return res.status(501).json({ error: "AI設定（ANTHROPIC_API_KEY）がありません" });
+  if (!req.aiAllowed) return res.status(403).json({ error: "このアカウントではAIは使えません" });
   try {
     res.json({ recipes: await extractWithClaude({ text }), method: "ai" });
   } catch (e) {
@@ -91,7 +99,7 @@ app.post("/api/import/text", async (req, res) => {
 app.post("/api/import/image", async (req, res) => {
   const { images } = req.body ?? {};
   if (!Array.isArray(images) || !images.length) return res.status(400).json({ error: "画像がありません" });
-  if (!aiAvailable()) return res.status(501).json({ error: "スクショの読み取りにはAI設定（ANTHROPIC_API_KEY）が必要です" });
+  if (!req.aiAllowed) return res.status(aiAvailable() ? 403 : 501).json({ error: aiAvailable() ? "このアカウントではAIは使えません" : "スクショの読み取りにはAI設定（ANTHROPIC_API_KEY）が必要です" });
   try {
     res.json({ recipes: await extractWithClaude({ images }), method: "ai" });
   } catch (e) {

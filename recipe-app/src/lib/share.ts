@@ -214,3 +214,14 @@ export async function deleteInbox(id: string) {
   const { error } = await need().from("inbox").delete().eq("id", id);
   msg(error, "削除できませんでした");
 }
+
+/** あとで登録ボックスの画面で選べるリクエスト先（ログイン不要） */
+export async function getInboxTargets(token: string): Promise<{ id: string; label: string }[]> {
+  const { data, error } = await need().rpc("get_inbox_targets", { p_inbox_token: token });
+  if (error) return []; // 5回目の設定前など
+  return Array.isArray(data) ? (data as { id: string; label: string }[]) : [];
+}
+export async function addRequestViaInbox(token: string, targetId: string, url: string, text = "") {
+  const { error } = await need().rpc("add_request_via_inbox", { p_inbox_token: token, p_target_id: targetId, p_url: url || null, p_text: text });
+  if (error) throw new Error(/見つかりません|止められ|名前|正しく|ありません|多すぎ|使えません/.test(error.message) ? error.message : `送れませんでした：${error.message}`);
+}

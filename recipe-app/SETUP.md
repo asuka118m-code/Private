@@ -40,6 +40,16 @@ SQL Editor で新しい入力欄を開き、`supabase/003_list_and_requests.sql`
 
 SQL Editor で `supabase/004_inbox.sql` の中身を全部貼り付けて **Run**（1回だけ）。
 
+### 1-追加4. アカウント（招待制）用の設定
+
+SQL Editor で `supabase/005_accounts.sql` の中身を全部貼り付けて **Run**（1回だけ）。
+
+**相手を招待する**：Supabase の **Authentication → Users →「Add user」→「Send invitation」** に相手のメールアドレスを入れる。
+相手には招待メールが届き、リンクを開くと「ようこそ」画面で名前とパスワードを決められる。
+（「Allow new users to sign up」はオフのままでOK。招待はできる）
+
+Vercel の `ALLOWED_EMAILS` は「AIを使える人」の意味になる（自分のメールアドレスだけにしておく）。
+
 ## 2. Anthropic（スクショ読み取りのAI）
 
 AIを使わない場合（テキスト貼り付けだけで使う場合）はこの手順を飛ばしてOKです。

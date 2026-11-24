@@ -1,17 +1,42 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { getGuestName, setGuestName } from "../lib/share";
+import { getMyName, onProfileChange } from "../lib/profile";
+import { useSyncState } from "../lib/useSync";
+
+/** ログイン中で名前を登録していれば、その名前（アカウントの名前で送る） */
+export function useAccountName() {
+  const sync = useSyncState();
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sync.session) { setName(null); return; }
+    const load = () => getMyName().then((n) => setName(n || null));
+    load();
+    return onProfileChange(load);
+  }, [sync.session]);
+  return name;
+}
 
 /**
  * 共有ページの名前欄。前回の名前が入った状態で出す。
  * そのまま送れて、変えたい時はタップして書き換えるだけ（送った名前が次回も入る）。
  */
 export function GuestNameField({ value, onChange }: { value: string; onChange: (n: string) => void }) {
+  const account = useAccountName();
+  useEffect(() => { if (account) onChange(account); }, [account, onChange]);
   // 同じページの別の欄で名前が変わったら、こちらにも反映する
   useEffect(() => {
     const on = () => onChange(getGuestName());
     window.addEventListener("guestname", on);
     return () => window.removeEventListener("guestname", on);
   }, [onChange]);
+  if (account) {
+    return (
+      <div className="name-field">
+        <span>名前</span>
+        <div className="account-name">👤 {account}<small>（アカウント）</small></div>
+      </div>
+    );
+  }
   return (
     <label className="name-field">
       <span>名前</span>
