@@ -124,7 +124,8 @@ export function ImportPage() {
     const drafts: RecipeDraft[] = result.recipes.map((r) => ({
       categoryIds,
       title: r.title || req?.text || "",
-      ...(req ? { memo: requestMemo(req), fromRequest: { id: req.id, author: req.author, kind: req.kind } } : {}),
+      memo: [req ? requestMemo(req) : "", r.memo ?? ""].filter(Boolean).join("\n"),
+      ...(req ? { fromRequest: { id: req.id, author: req.author, kind: req.kind } } : {}),
       servings: r.servings || "",
       ingredients: (r.ingredients ?? []).map((i) => (i.mark ? i : { name: i.name, amount: i.amount })),
       steps: r.steps ?? [],
