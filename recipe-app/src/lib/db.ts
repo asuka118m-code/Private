@@ -3,7 +3,9 @@ import type { Category, Recipe, RecipeDraft } from "./types";
 
 interface RecipeDB extends DBSchema {
   recipes: { key: string; value: Recipe; indexes: { updatedAt: number } };
-  images: { key: string; value: { id: string; blob: Blob } };
+  // 画像。Safariのプライベートブラウズは Blob を保存できないため、中身（ArrayBuffer）で保存する
+  // （古いデータは blob のまま入っていることがある）
+  images: { key: string; value: ImageRecord };
   // --- 同期用 ---
   meta: { key: string; value: { key: string; value: unknown } };
   tombstones: { key: string; value: { id: string; deletedAt: number } }; // 削除したレシピ（クラウドへ伝える）
@@ -11,6 +13,11 @@ interface RecipeDB extends DBSchema {
   syncedImages: { key: string; value: { id: string } }; // クラウドにアップ済みの画像
   categories: { key: string; value: Category };
 }
+
+export interface ImageRecord { id: string; blob?: Blob; data?: ArrayBuffer; type?: string }
+
+const toRecord = async (id: string, blob: Blob): Promise<ImageRecord> => ({ id, data: await blob.arrayBuffer(), type: blob.type || "image/jpeg" });
+const toBlob = (r?: ImageRecord): Blob | undefined => (!r ? undefined : r.data ? new Blob([r.data], { type: r.type || "image/jpeg" }) : r.blob);
 
 /** 同期で使うカテゴリのID（レシピと区別するため先頭に付ける） */
 export const CATEGORY_PREFIX = "cat:";
@@ -80,12 +87,22 @@ export async function deleteRecipe(recipe: Recipe) {
 
 export async function putImage(blob: Blob) {
   const id = newId();
-  await (await dbPromise).put("images", { id, blob });
+  await storeImage(id, blob);
   return id;
 }
 
+/** 決まったIDで画像を保存（同期・復元用） */
+export async function storeImage(id: string, blob: Blob) {
+  const rec = await toRecord(id, blob);
+  await (await dbPromise).put("images", rec);
+}
+
 export async function getImage(id: string) {
-  return (await (await dbPromise).get("images", id))?.blob;
+  return toBlob(await (await dbPromise).get("images", id));
+}
+
+export async function hasImage(id: string) {
+  return (await (await dbPromise).getKey("images", id)) !== undefined;
 }
 
 export async function deleteImage(id: string) {
@@ -147,19 +164,21 @@ export async function saveDraftAsRecipe(d: RecipeDraft) {
 /** バックアップ用：全データ */
 export async function getAllData() {
   const db = await dbPromise;
-  return { recipes: await db.getAll("recipes"), images: await db.getAll("images"), categories: await db.getAll("categories") };
+  const images = (await db.getAll("images")).map((r) => ({ id: r.id, blob: toBlob(r)! })).filter((x) => x.blob);
+  return { recipes: await db.getAll("recipes"), images, categories: await db.getAll("categories") };
 }
 
 /** バックアップから復元。同じレシピは更新日時が新しい方を残す */
 export async function mergeData(recipes: Recipe[], images: { id: string; blob: Blob }[], categories: Category[] = []) {
   const db = await dbPromise;
   let added = 0, updated = 0;
+  const records = await Promise.all(images.map((i) => toRecord(i.id, i.blob))); // トランザクションの前に変換しておく
   const tx = db.transaction(["recipes", "images", "categories"], "readwrite");
   for (const c of categories) {
     const cur = await tx.objectStore("categories").get(c.id);
     if (!cur || c.updatedAt > cur.updatedAt) await tx.objectStore("categories").put({ ...c, updatedAt: Date.now() });
   }
-  for (const img of images) await tx.objectStore("images").put(img);
+  for (const rec of records) await tx.objectStore("images").put(rec);
   for (const r of recipes) {
     const cur = await tx.objectStore("recipes").get(r.id);
     // 復元したものも同期で他の端末へ送られるよう、更新日時を今にする
