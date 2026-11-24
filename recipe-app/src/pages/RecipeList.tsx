@@ -6,8 +6,9 @@ import type { Category, Recipe } from "../lib/types";
 import { StoredImage } from "../components/StoredImage";
 import { cookedCount, daysSince, isCooked, lastCooked } from "../lib/cooked";
 import { ShareDialog } from "../components/ShareDialog";
-import { fetchRequests, type FoodRequest } from "../lib/share";
+import { fetchInbox, fetchRequests, type FoodRequest, type InboxItem } from "../lib/share";
 import { RequestBoard } from "../components/RequestBoard";
+import { InboxBoard } from "../components/InboxBoard";
 
 type CookFilter = "all" | "cooked" | "notyet";
 type SortKey = "updated" | "recent" | "longago";
@@ -28,11 +29,16 @@ export function RecipeList() {
   const [requests, setRequests] = useState<FoodRequest[]>([]);
   const openRequests = requests.filter((x) => !x.done).length;
   const [params, setParams] = useSearchParams();
-  const showRequests = params.get("view") === "requests";
-  const setShowRequests = (on: boolean) => setParams(on ? { view: "requests" } : {}, { replace: true });
+  const view = params.get("view"); // "requests" | "inbox" | null（レシピ）
+  const showRequests = view === "requests";
+  const showInbox = view === "inbox";
+  const setView = (v: "requests" | "inbox" | null) => setParams(v ? { view: v } : {}, { replace: true });
+  const setShowRequests = (on: boolean) => setView(on ? "requests" : null);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const openInbox = inbox.filter((x) => !x.done).length;
   useEffect(() => {
     if (!sync.session) return;
-    const load = () => fetchRequests().then(setRequests);
+    const load = () => { fetchRequests().then(setRequests); fetchInbox().then(setInbox); };
     load();
     const onVisible = () => document.visibilityState === "visible" && load();
     document.addEventListener("visibilitychange", onVisible);
@@ -78,14 +84,17 @@ export function RecipeList() {
       {sync.enabled && !sync.session && (
         <Link to="/settings" className="notice">ログインすると、iPhone・iPadなど複数の端末でレシピが同期されます ›</Link>
       )}
+      {openInbox > 0 && !view && (
+        <button className="notice inbox-notice" onClick={() => setView("inbox")}>🔖 あとで登録が{openInbox}件あります ›</button>
+      )}
       {openRequests > 0 && !showRequests && (
         <button className="notice request-notice" onClick={() => setShowRequests(true)}>🙋 食べたいリクエストが{openRequests}件届いています ›</button>
       )}
       <input className="search" placeholder="料理名・材料で検索" value={q} onChange={(e) => setQ(e.target.value)} />
       <nav className="cat-bar">
-        <button className={`chip ${!showRequests && current === "" ? "on" : ""}`} onClick={() => { select(""); setShowRequests(false); }}>すべて <span>{recipes?.length ?? 0}</span></button>
+        <button className={`chip ${!view && current === "" ? "on" : ""}`} onClick={() => { select(""); setView(null); }}>すべて <span>{recipes?.length ?? 0}</span></button>
         {categories.map((c) => (
-          <button key={c.id} className={`chip ${!showRequests && current === c.id ? "on" : ""}`} onClick={() => { select(c.id); setShowRequests(false); }}>
+          <button key={c.id} className={`chip ${!view && current === c.id ? "on" : ""}`} onClick={() => { select(c.id); setView(null); }}>
             {c.name} <span>{count(c.id)}</span>
           </button>
         ))}
@@ -94,10 +103,17 @@ export function RecipeList() {
             🙋 リクエスト {openRequests > 0 && <span className="req-count">{openRequests}</span>}
           </button>
         )}
+        {sync.session && (inbox.length > 0 || showInbox) && (
+          <button className={`chip inbox-chip ${showInbox ? "on" : ""}`} onClick={() => setView(showInbox ? null : "inbox")}>
+            🔖 あとで登録 {openInbox > 0 && <span className="req-count inbox-count">{openInbox}</span>}
+          </button>
+        )}
         <Link to="/categories" className="chip ghost">{categories.length ? "✎ カテゴリ編集" : "＋ カテゴリを作る"}</Link>
       </nav>
       {showRequests ? (
         <RequestBoard requests={requests} recipes={recipes ?? []} onChange={setRequests} />
+      ) : showInbox ? (
+        <InboxBoard items={inbox} recipes={recipes ?? []} onChange={setInbox} />
       ) : (<>
       {current && (
         <Link to={`/categories/${current}/select`} className="btn wide add-to-cat">＋ レシピを選んで「{categories.find((c) => c.id === current)?.name}」に追加</Link>

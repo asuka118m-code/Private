@@ -42,7 +42,7 @@ export interface RecipeDraft {
   sourceImages: Blob[];
   categoryIds?: string[];
   memo?: string;
-  fromRequest?: { id: string; author: string }; // リクエストをOKして作る場合
+  fromRequest?: { id: string; author: string; kind?: "request" | "inbox" }; // リクエスト・あとで登録から作る場合
 }
 
 export interface Category {

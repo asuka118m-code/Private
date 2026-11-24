@@ -91,7 +91,7 @@ export function ImportPage() {
     if (!req) return;
     setDraft({
       title: req.text, servings: "", ingredients: [], steps: [], sourceUrl: req.url ?? "", sourceImages: [],
-      memo: requestMemo(req), fromRequest: { id: req.id, author: req.author },
+      memo: requestMemo(req), fromRequest: { id: req.id, author: req.author, kind: req.kind },
     });
     clearPendingRequest();
     nav("/new");
@@ -124,7 +124,7 @@ export function ImportPage() {
     const drafts: RecipeDraft[] = result.recipes.map((r) => ({
       categoryIds,
       title: r.title || req?.text || "",
-      ...(req ? { memo: requestMemo(req), fromRequest: { id: req.id, author: req.author } } : {}),
+      ...(req ? { memo: requestMemo(req), fromRequest: { id: req.id, author: req.author, kind: req.kind } } : {}),
       servings: r.servings || "",
       ingredients: (r.ingredients ?? []).map((i) => (i.mark ? i : { name: i.name, amount: i.amount })),
       steps: r.steps ?? [],
@@ -224,7 +224,7 @@ export function ImportPage() {
       </header>
       {req && (
         <div className="notice request-notice">
-          🙋 {req.author}さんのリクエスト{req.text ? `「${req.text}」` : ""}をレシピにします
+          {req.kind === "inbox" ? "🔖 あとで登録に保存したものをレシピにします" : `🙋 ${req.author}さんのリクエスト${req.text ? `「${req.text}」` : ""}をレシピにします`}
           {req.url ? "。参考URLから読み取っています…" : ""}
         </div>
       )}

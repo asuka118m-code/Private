@@ -4,6 +4,7 @@ import { exportBackup, importBackup } from "../lib/backup";
 import { supabase } from "../lib/supabase";
 import { syncNow, useSyncState } from "../lib/useSync";
 import { getLastSyncedAt } from "../lib/sync";
+import { createInboxLink, getInboxLink, inboxUrl, resetInboxLink } from "../lib/share";
 
 function AccountSection() {
   const sync = useSyncState();
@@ -117,6 +118,7 @@ export function SettingsPage() {
       </header>
       <AccountSection />
       <ShortcutSection />
+      <InboxSection />
       <section className="panel">
         <h2>バックアップの書き出し</h2>
         <p className="hint">全レシピ・画像・コメントを1つのファイルに保存します。iPhone/iPadでは「"ファイル"に保存」からiCloud Driveに保存しておくと安心です。</p>
@@ -155,6 +157,37 @@ function ShortcutSection() {
         <li>「URLをエンコード」の入力が「<b>ショートカットの入力</b>」になっていることを確認して完了</li>
       </ol>
       <p className="hint small">送るとSafariで開きます。Safariでもログインしておくと、読み取ったレシピが同期され、ホーム画面のアプリにも入ります。</p>
+    </section>
+  );
+}
+
+/** あとで登録ボックス：ログインなし（プライベートブラウズでも）でショートカットから保存する */
+function InboxSection() {
+  const sync = useSyncState();
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+  const [msg, setMsg] = useState("");
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { if (sync.session) getInboxLink().then(setToken).catch((e) => { setMsg(e.message); setToken(null); }); }, [sync.session]);
+  if (!sync.session) return null;
+  const run = async (f: () => Promise<string>) => { setMsg(""); try { setToken(await f()); setCopied(false); } catch (e) { setMsg((e as Error).message); } };
+
+  return (
+    <section className="panel">
+      <h2>🔖 あとで登録ボックス</h2>
+      <p className="hint">ショートカットの送り先をこのボックスにすると、<b>ログインしていなくても（プライベートブラウズでも）</b>URLを保存できます。保存したものは、一覧の「🔖 あとで登録」から登録できます。</p>
+      {token === undefined ? <p className="hint">確認中…</p> : token ? (
+        <>
+          <p className="hint small">ショートカットの「テキスト」の文字を、これに置き換えてください（後ろの「URLエンコード済みのテキスト」はそのまま）。</p>
+          <div className="share-url">{inboxUrl(token)}</div>
+          <div className="row">
+            <button className="btn small" onClick={async () => { await navigator.clipboard?.writeText(inboxUrl(token)); setCopied(true); }}>{copied ? "コピーしました" : "この文字をコピー"}</button>
+            <button className="link small" onClick={() => confirm("作り直すと、今のショートカットの文字は使えなくなります。作り直しますか？") && run(() => resetInboxLink(token))}>作り直す</button>
+          </div>
+        </>
+      ) : (
+        <button className="btn primary" onClick={() => run(createInboxLink)}>ボックスを作る</button>
+      )}
+      {msg && <p className="hint">{msg}</p>}
     </section>
   );
 }
