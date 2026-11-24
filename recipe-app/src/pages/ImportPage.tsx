@@ -56,6 +56,23 @@ export function ImportPage() {
   const [useAi, setUseAi] = useState(false);
   const [preview, setPreview] = useState<(RecipeDraft & { checked: boolean })[] | null>(null);
   const autoRan = useRef(false);
+  const canPaste = typeof navigator !== "undefined" && !!navigator.clipboard?.readText;
+  // ショートカットから来たのにURLが空だった
+  const emptyShare = params.get("auto") === "1" && !params.get("url");
+
+  async function pasteAndRead() {
+    setError("");
+    try {
+      const t = await navigator.clipboard.readText();
+      const u = findUrl(t);
+      if (!u) { setError("コピーされた中にURLが見つかりませんでした。Instagramなどで「リンクをコピー」してから押してください"); return; }
+      setTab("url");
+      setUrl(u);
+      runUrl(u);
+    } catch {
+      setError("貼り付けが許可されませんでした。URL欄を長押しして「ペースト」してください");
+    }
+  }
 
   useEffect(() => { aiStatus().then(setAi); }, []);
 
@@ -222,6 +239,12 @@ export function ImportPage() {
         {tab === "url" && (
           <>
             <p className="hint">レシピサイトやSNS投稿のURLを貼り付けてください。</p>
+            {emptyShare && !url && (
+              <div className="notice">共有からURLを受け取れませんでした。Instagramなどで「リンクをコピー」してから、下の「📋」ボタンを押してください。</div>
+            )}
+            {canPaste && (
+              <button className="btn primary wide paste-btn" disabled={busy} onClick={pasteAndRead}>📋 コピーしたリンクを貼り付けて読み取る</button>
+            )}
             <input className="input" type="url" inputMode="url" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
           </>
         )}

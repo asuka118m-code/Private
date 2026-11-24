@@ -233,3 +233,4 @@ button.notice { width: 100%; text-align: left; border: 0; font: inherit; cursor:
 .howto .share-url { margin: 6px 0; }
 .howto-box { background: #fff; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .requests-panel > .link.small { text-align: left; }
+.paste-btn { margin-bottom: 0; }
