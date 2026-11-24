@@ -1,22 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { addSharedComment, getGuestName, getSharedRecipe, loadSharedImage, type SharedRecipe } from "../lib/share";
+import { Link, useParams } from "react-router-dom";
+import { addSharedComment, getGuestName, getSharedRecipe, type SharedRecipe } from "../lib/share";
+import { SharedImage } from "../components/SharedImage";
+import { RequestForm } from "../components/RequestForm";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { CommentList } from "../components/CommentList";
-import { StoredImage } from "../components/StoredImage";
 import { StepText } from "./RecipeDetail";
 import type { Comment } from "../lib/types";
 
-function SharedImage({ ownerId, id, className, onClick }: { ownerId: string; id: string; className?: string; onClick?: () => void }) {
-  const [blob, setBlob] = useState<Blob | null | undefined>(undefined);
-  useEffect(() => { loadSharedImage(ownerId, id).then(setBlob); }, [ownerId, id]);
-  if (blob === null) return null;
-  return blob ? <StoredImage blob={blob} className={className} onClick={onClick} /> : <div className={`img-placeholder ${className ?? ""}`} />;
-}
-
 /** 共有リンクを開いた人が見るページ（ログイン不要） */
 export function SharedRecipePage() {
-  const { token = "" } = useParams();
+  const { token = "", recipeId } = useParams();
   const [data, setData] = useState<SharedRecipe | null | undefined>(undefined);
   const [error, setError] = useState("");
   const [name, setName] = useState(getGuestName());
@@ -27,8 +21,8 @@ export function SharedRecipePage() {
   const [zoom, setZoom] = useState<string | null>(null);
 
   useEffect(() => {
-    getSharedRecipe(token).then(setData).catch((e) => { setError(e.message); setData(null); });
-  }, [token]);
+    getSharedRecipe(token, recipeId).then(setData).catch((e) => { setError(e.message); setData(null); });
+  }, [token, recipeId]);
 
   if (data === undefined) return <div className="page"><p className="empty">読み込み中…</p></div>;
   if (!data) {
@@ -46,7 +40,7 @@ export function SharedRecipePage() {
   async function send() {
     setSending(true); setError("");
     try {
-      const c = await addSharedComment(token, name.trim(), text.trim(), rating || undefined);
+      const c = await addSharedComment(token, name.trim(), text.trim(), rating || undefined, recipeId);
       setData((d) => d && { ...d, comments: [c, ...d.comments] });
       setText(""); setRating(0); setSent(true);
     } catch (e) {
@@ -59,8 +53,11 @@ export function SharedRecipePage() {
   return (
     <div className="page detail shared-page">
       <header className="shared-head">
-        <img src="/icons-v2/icon-192.png" alt="" />
-        <span>{data.ownerName ? `${data.ownerName}さんから届いたレシピ` : "共有されたレシピ"}</span>
+        {recipeId ? (
+          <Link to={`/s/${token}`} className="back">‹ レシピ一覧</Link>
+        ) : (
+          <><img src="/icons-v2/icon-192.png" alt="" /><span>{data.ownerName ? `${data.ownerName}さんから届いたレシピ` : "共有されたレシピ"}</span></>
+        )}
       </header>
       {cover && <SharedImage ownerId={data.ownerId} id={cover} className="hero" onClick={() => setZoom(cover)} />}
       <h1 className="recipe-title">{r.title}</h1>
@@ -84,6 +81,14 @@ export function SharedRecipePage() {
         <section className="panel">
           <h2>作った料理の写真</h2>
           <div className="thumbs">{r.photoIds.map((p) => <div key={p} className="thumb"><SharedImage ownerId={data.ownerId} id={p} onClick={() => setZoom(p)} /></div>)}</div>
+        </section>
+      )}
+
+      {recipeId && (
+        <section className="panel">
+          <h2>食べたい！</h2>
+          <p className="hint">{data.ownerName ? `${data.ownerName}さん` : "作る人"}に「これ作って」と伝えられます。</p>
+          <RequestForm token={token} recipeId={recipeId} recipeTitle={r.title} />
         </section>
       )}
 
