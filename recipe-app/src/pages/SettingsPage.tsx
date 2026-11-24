@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { syncNow, useSyncState } from "../lib/useSync";
 import { getLastSyncedAt } from "../lib/sync";
 import { createInboxLink, getInboxLink, inboxUrl, resetInboxLink } from "../lib/share";
+import { getMyName, listTargets, removeTarget, saveMyName, type RequestTarget } from "../lib/profile";
 
 function AccountSection() {
   const sync = useSyncState();
@@ -15,6 +16,7 @@ function AccountSection() {
   const [busy, setBusy] = useState(false);
   const [lastSynced, setLastSynced] = useState<number>();
   const recovery = params.get("recovery") === "1";
+  const welcome = params.get("welcome") === "1";
 
   useEffect(() => { getLastSyncedAt().then(setLastSynced); }, [sync.status]);
   if (!supabase) return null;
@@ -33,6 +35,8 @@ function AccountSection() {
       /not confirmed/i.test(m) ? "確認メールのリンクを開いてから、もう一度ログインしてください" :
       /at least 6/i.test(m) ? "パスワードは6文字以上にしてください" : m);
   };
+
+  if (sync.session && welcome) return <WelcomeSection />;
 
   if (sync.session && recovery) {
     return (
@@ -56,6 +60,8 @@ function AccountSection() {
             lastSynced ? `最終同期：${new Date(lastSynced).toLocaleString("ja-JP")}` : ""}
         </p>
         <button className="btn primary" disabled={sync.status === "syncing"} onClick={() => syncNow()}>今すぐ同期</button>
+        <NameField />
+        <PasswordChange />
         <button className="link small" onClick={() => confirm("ログアウトしますか？（この端末のレシピは残ります）") && supabase!.auth.signOut()}>ログアウト</button>
       </section>
     );
@@ -119,6 +125,7 @@ export function SettingsPage() {
       <AccountSection />
       <ShortcutSection />
       <InboxSection />
+      <TargetsSection />
       <section className="panel">
         <h2>バックアップの書き出し</h2>
         <p className="hint">全レシピ・画像・コメントを1つのファイルに保存します。iPhone/iPadでは「"ファイル"に保存」からiCloud Driveに保存しておくと安心です。</p>
@@ -188,6 +195,86 @@ function InboxSection() {
         <button className="btn primary" onClick={() => run(createInboxLink)}>ボックスを作る</button>
       )}
       {msg && <p className="hint">{msg}</p>}
+    </section>
+  );
+}
+
+/** アカウントの名前（コメント・リクエストに使われる） */
+function NameField({ onSaved }: { onSaved?: () => void }) {
+  const [name, setName] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { getMyName().then((n) => { setName(n ?? ""); setLoaded(true); }); }, []);
+  if (!loaded) return null;
+  return (
+    <div className="field">
+      名前（コメントやリクエストに表示されます）
+      <div className="row">
+        <input className="input grow" maxLength={40} value={name} placeholder="例：あすか" onChange={(e) => { setName(e.target.value); setMsg(""); }} />
+        <button className="btn small" disabled={!name.trim()} onClick={async () => {
+          try { await saveMyName(name); setMsg("保存しました"); onSaved?.(); } catch (e) { setMsg((e as Error).message); }
+        }}>保存</button>
+      </div>
+      {msg && <span className="hint small">{msg}</span>}
+    </div>
+  );
+}
+
+function PasswordChange({ title = "パスワードを変更", onDone }: { title?: string; onDone?: () => void }) {
+  const [open, setOpen] = useState(!!onDone);
+  const [pw, setPw] = useState("");
+  const [msg, setMsg] = useState("");
+  if (!open) return <button className="link small" onClick={() => setOpen(true)}>{title}</button>;
+  return (
+    <div className="field">
+      {title}
+      <div className="row">
+        <input className="input grow" type="password" autoComplete="new-password" placeholder="6文字以上" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <button className="btn small" disabled={pw.length < 6} onClick={async () => {
+          const { error } = await supabase!.auth.updateUser({ password: pw });
+          if (error) setMsg(error.message); else { setMsg("設定しました"); setPw(""); onDone?.(); }
+        }}>設定</button>
+      </div>
+      {msg && <span className="hint small">{msg}</span>}
+    </div>
+  );
+}
+
+/** 招待メールから初めて来た人：名前とパスワードを決める */
+function WelcomeSection() {
+  const [nameDone, setNameDone] = useState(false);
+  const [pwDone, setPwDone] = useState(false);
+  return (
+    <section className="panel welcome">
+      <h2>ようこそ、あじめもへ！</h2>
+      <p className="hint">はじめに、名前とパスワードを決めてください。名前は、コメントやリクエストを送る時に相手に表示されます。</p>
+      <NameField onSaved={() => setNameDone(true)} />
+      <PasswordChange title="パスワード（次からのログインに使います）" onDone={() => setPwDone(true)} />
+      {nameDone && pwDone && <Link to="/" className="btn primary wide">はじめる</Link>}
+    </section>
+  );
+}
+
+/** リクエスト先（相手の一覧の共有リンク）。あとで登録ボックスの画面から選べる */
+function TargetsSection() {
+  const sync = useSyncState();
+  const [targets, setTargets] = useState<RequestTarget[] | null>(null);
+  useEffect(() => { if (sync.session) listTargets().then(setTargets); }, [sync.session]);
+  if (!sync.session || !targets) return null;
+  return (
+    <section className="panel">
+      <h2>🙋 リクエスト先</h2>
+      <p className="hint small">相手からもらった「一覧の共有リンク」を開いて「リクエスト先に登録」を押すと、ここに並びます。ショートカット（あとで登録ボックス）で送る時に「○○さんにリクエスト」を選べます。</p>
+      {targets.length === 0 ? <p className="hint small">まだありません。</p> : (
+        <ul className="target-list">
+          {targets.map((t) => (
+            <li key={t.id}>
+              <Link to={`/s/${t.token}`} className="recipe-link">{t.label}さんのレシピ</Link>
+              <button className="link small" onClick={() => confirm(`「${t.label}」をリクエスト先から外しますか？`) && removeTarget(t.id).then(() => setTargets(targets.filter((x) => x.id !== t.id)))}>外す</button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

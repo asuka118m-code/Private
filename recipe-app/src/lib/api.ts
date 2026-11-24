@@ -52,7 +52,7 @@ export async function fetchRemoteImage(url: string): Promise<Blob | null> {
 
 export async function aiStatus(): Promise<boolean> {
   try {
-    return (await (await fetch("/api/status")).json()).ai;
+    return (await (await fetch("/api/status", { headers: await authHeader() })).json()).ai;
   } catch {
     return false;
   }

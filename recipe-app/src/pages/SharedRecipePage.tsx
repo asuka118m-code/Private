@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { addSharedComment, getGuestName, getSharedRecipe, type SharedRecipe } from "../lib/share";
 import { SharedImage } from "../components/SharedImage";
 import { RequestForm } from "../components/RequestForm";
 import { GuestNameField } from "../components/GuestName";
+import { useSyncState } from "../lib/useSync";
+import { copySharedRecipe } from "../lib/copy";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { CommentList } from "../components/CommentList";
 import { StepText } from "./RecipeDetail";
@@ -20,6 +22,9 @@ export function SharedRecipePage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [zoom, setZoom] = useState<string | null>(null);
+  const sync = useSyncState();
+  const nav = useNavigate();
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     getSharedRecipe(token, recipeId).then(setData).catch((e) => { setError(e.message); setData(null); });
@@ -61,6 +66,13 @@ export function SharedRecipePage() {
         )}
       </header>
       {cover && <SharedImage ownerId={data.ownerId} id={cover} className="hero" onClick={() => setZoom(cover)} />}
+      {sync.session && sync.session.user.id !== data.ownerId && (
+        <button className="btn copy-btn" disabled={copying} onClick={async () => {
+          setCopying(true);
+          try { const id = await copySharedRecipe(data); nav(`/recipe/${id}`); }
+          catch (e) { setError(e instanceof Error ? e.message : String(e)); setCopying(false); }
+        }}>{copying ? "登録中…" : "📥 自分のレシピに登録"}</button>
+      )}
       <h1 className="recipe-title">{r.title}</h1>
       {r.servings && <div className="servings">{r.servings}</div>}
 

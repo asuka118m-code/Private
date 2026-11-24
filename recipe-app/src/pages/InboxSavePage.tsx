@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { addInbox } from "../lib/share";
+import { addInbox, addRequestViaInbox, getInboxTargets } from "../lib/share";
 import { findUrl } from "../lib/api";
 
 /**
@@ -11,7 +11,10 @@ export function InboxSavePage() {
   const { token = "" } = useParams();
   const [params] = useSearchParams();
   const incoming = findUrl(params.get("url") || "") || (params.get("url") || "").trim();
-  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [state, setState] = useState<"loading" | "choose" | "idle" | "saving" | "saved" | "sent" | "error">("loading");
+  const [targets, setTargets] = useState<{ id: string; label: string }[]>([]);
+  const [sentTo, setSentTo] = useState("");
+  const [note, setNote] = useState("");
   const [saved, setSaved] = useState("");
   const [error, setError] = useState("");
   const [manual, setManual] = useState("");
@@ -29,10 +32,30 @@ export function InboxSavePage() {
     }
   }
 
+  // リクエスト先が登録されていれば「自分に保存／○○さんにリクエスト」を選ぶ。なければすぐ保存
   useEffect(() => {
-    if (incoming && !ran.current) { ran.current = true; save(incoming); }
+    if (ran.current) return;
+    ran.current = true;
+    getInboxTargets(token).then((t) => {
+      setTargets(t);
+      if (!incoming) setState("idle");
+      else if (t.length) setState("choose");
+      else save(incoming);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incoming]);
+  }, [token]);
+
+  async function sendTo(id: string, label: string) {
+    setState("saving"); setError("");
+    try {
+      await addRequestViaInbox(token, id, incoming, note.trim());
+      setSentTo(label);
+      setState("sent");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setState("choose");
+    }
+  }
 
   async function paste() {
     try {
@@ -48,7 +71,26 @@ export function InboxSavePage() {
         <span>あとで登録ボックス</span>
       </header>
       <section className="panel">
-        {state === "saving" && <p>保存中…</p>}
+        {state === "loading" && <p>読み込み中…</p>}
+        {state === "saving" && <p>送信中…</p>}
+        {state === "choose" && (
+          <>
+            <h2>どうしますか？</h2>
+            <p className="share-url">{incoming}</p>
+            <button className="btn primary wide" onClick={() => save(incoming)}>🔖 自分に保存（あとで登録）</button>
+            <input className="input" maxLength={500} placeholder="ひとこと（リクエストに付ける・なくてもOK）" value={note} onChange={(e) => setNote(e.target.value)} />
+            {targets.map((t) => (
+              <button key={t.id} className="btn wide target-send" onClick={() => sendTo(t.id, t.label)}>🙋 {t.label}さんにリクエスト</button>
+            ))}
+          </>
+        )}
+        {state === "sent" && (
+          <>
+            <h2>🙋 {sentTo}さんにリクエストしました</h2>
+            <p className="share-url">{incoming}</p>
+            <p className="hint">このページは閉じて大丈夫です。</p>
+          </>
+        )}
         {state === "saved" && (
           <>
             <h2>🔖 保存しました</h2>

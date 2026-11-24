@@ -49,6 +49,11 @@ export function initSync() {
     notify();
     if (event === "SIGNED_IN") syncNow();
     if (event === "PASSWORD_RECOVERY" && !location.search.includes("recovery")) location.replace("/settings?recovery=1");
+    // 招待メールから初めて来た人は、名前とパスワードの設定へ
+    if (event === "SIGNED_IN" && sessionStorage.getItem("recipe-app:invite") && !location.search.includes("welcome")) {
+      sessionStorage.removeItem("recipe-app:invite");
+      location.replace("/settings?welcome=1");
+    }
   });
   onDataChange((src) => src === "local" && syncSoon());
   addEventListener("online", () => syncNow());

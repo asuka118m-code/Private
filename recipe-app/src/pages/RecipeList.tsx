@@ -8,6 +8,7 @@ import { cookedCount, daysSince, isCooked, lastCooked } from "../lib/cooked";
 import { ShareDialog } from "../components/ShareDialog";
 import { fetchInbox, fetchRequests, type FoodRequest, type InboxItem } from "../lib/share";
 import { RequestBoard } from "../components/RequestBoard";
+import { getMyName } from "../lib/profile";
 import { InboxBoard } from "../components/InboxBoard";
 
 type CookFilter = "all" | "cooked" | "notyet";
@@ -35,6 +36,8 @@ export function RecipeList() {
   const setView = (v: "requests" | "inbox" | null) => setParams(v ? { view: v } : {}, { replace: true });
   const setShowRequests = (on: boolean) => setView(on ? "requests" : null);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [myName, setMyName] = useState<string | null>(null);
+  useEffect(() => { if (sync.session) getMyName().then(setMyName); }, [sync.session]);
   const openInbox = inbox.filter((x) => !x.done).length;
   useEffect(() => {
     if (!sync.session) return;
@@ -83,6 +86,9 @@ export function RecipeList() {
       </header>
       {sync.enabled && !sync.session && (
         <Link to="/settings" className="notice">ログインすると、iPhone・iPadなど複数の端末でレシピが同期されます ›</Link>
+      )}
+      {sync.session && myName === "" && (
+        <Link to="/settings" className="notice">👤 名前を登録してください（コメントやリクエストを送る時に表示されます） ›</Link>
       )}
       {openInbox > 0 && !view && (
         <button className="notice inbox-notice" onClick={() => setView("inbox")}>🔖 あとで登録が{openInbox}件あります ›</button>
