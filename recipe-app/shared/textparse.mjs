@@ -117,10 +117,12 @@ const QTY = /^(約|各)?\s*([0-9０-９½¼¾⅓⅔]|大さじ|小さじ|カッ�
 /** 「醤油 大さじ2」のような材料らしい行か */
 function ingredientLike(line) {
   const s = String(line).trim();
-  if (!s || s.length > 40 || /[。]$/.test(s) || STEP_NUM.test(s)) return false;
+  if (!s || s.length > 60 || /[。]$/.test(s) || STEP_NUM.test(s)) return false;
   const ing = splitIngredient(s);
   if (!ing || !ing.amount || !QTY.test(ing.amount)) return false;
-  return ing.name.length <= 20 && !/[をでてにがは]$/.test(ing.name);
+  // 「コンソメ水（水600mlに顆粒コンソメ小さじ1）」のようなカッコの説明は、名前の長さに数えない
+  const core = ing.name.replace(/[（(][^）)]*[）)]/g, "").trim();
+  return core.length >= 1 && core.length <= 20 && !/[をでてにがは]$/.test(core);
 }
 
 /** 1行に「春雨40g、きゅうり1本」のように並んでいれば分ける */
@@ -173,8 +175,10 @@ export function parseRecipeText(text) {
     for (const ing of splitIngredientLine(line)) ingredients.push(!ing.mark && groupMark ? { ...ing, mark: groupMark } : ing);
   };
   const pushStep = (line) => { steps.push(stripStepNumber(line)); };
+  // 後ろに「作り方」の見出しがあるなら、材料の欄の行は（長くても）材料として扱う
+  const stepHeadAt = lines.findIndex((l) => STEP_HEAD.test(stripDeco(l).replace(EMOJI, "").trim()));
 
-  for (const line of lines) {
+  for (const [idx, line] of lines.entries()) {
     if (!line) { blank = true; if (mode === "ing") groupMark = ""; continue; }
     const wasBlank = blank;
     blank = false;
@@ -209,8 +213,8 @@ export function parseRecipeText(text) {
     if (mode === "ing") {
       if (isNum && !ingredientLike(line)) { mode = "step"; numbered = true; pushStep(line); continue; }
       if (ingredientLike(line) || /^[^\s。]{1,15}$/.test(line) || takeMark(line).mark) { pushIngredients(line); continue; }
-      // 材料の途中に文章が来たら、番号のない作り方とみなす
-      if (/[。！!]$/.test(line) || line.length > 20) { mode = "step"; pushStep(line); continue; }
+      // 材料の途中に文章が来たら、番号のない作り方とみなす（後ろに「作り方」の見出しがある時は材料のまま）
+      if (!(stepHeadAt > idx) && (/[。！!]$/.test(line) || line.length > 20)) { mode = "step"; pushStep(line); continue; }
       pushIngredients(line);
       continue;
     }

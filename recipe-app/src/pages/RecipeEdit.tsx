@@ -7,6 +7,7 @@ import { ImagePicker } from "../components/ImagePicker";
 import { StoredImage } from "../components/StoredImage";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { RecipePicker } from "../components/RecipePicker";
+import { AutoTextarea } from "../components/AutoTextarea";
 import { MARK_CHOICES } from "../../shared/textparse.mjs";
 import { acceptInbox, acceptRequest } from "../lib/share";
 import { markColor } from "../components/Mark";
@@ -184,7 +185,7 @@ export function RecipeEdit() {
                 <option value="">印</option>
                 {MARK_CHOICES.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
-              <input className="input grow" placeholder="材料" value={ing.name}
+              <input className="input grow ing-name" placeholder="材料" value={ing.name}
                 onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
               <input className="input amount" placeholder="分量" value={ing.amount}
                 onChange={(e) => setIngredients((p) => p.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
@@ -226,7 +227,7 @@ export function RecipeEdit() {
         {steps.map((s, i) => (
           <div key={i} className="row step-row">
             <span className="num">{i + 1}</span>
-            <textarea className="input grow" rows={2} value={s} placeholder="手順を入力"
+            <AutoTextarea className="input grow" value={s} placeholder="手順を入力"
               onChange={(e) => setSteps((p) => p.map((x, j) => (j === i ? e.target.value : x)))} />
             <div className="row-tools col">
               <button type="button" onClick={() => setSteps((p) => move(p, i, -1))}>↑</button>
@@ -254,7 +255,7 @@ export function RecipeEdit() {
 
       <section className="panel">
         <h2>メモ</h2>
-        <textarea className="input" rows={3} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="コツ・アレンジなど" />
+        <AutoTextarea className="input" rows={3} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="コツ・アレンジなど" />
       </section>
 
       <button className="btn primary wide" disabled={saving} onClick={save}>{saving ? "保存中…" : "保存する"}</button>
