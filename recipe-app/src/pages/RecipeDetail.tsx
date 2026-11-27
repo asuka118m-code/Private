@@ -8,6 +8,8 @@ import { scaleAmount } from "../lib/scale";
 import { ShareDialog } from "../components/ShareDialog";
 import { CookedPanel } from "../components/CookedPanel";
 import { CopyTextButton } from "../components/CopyTextButton";
+import { addRecipeToShopping, ownShopApi, shoppingRecipeIds } from "../lib/shopping";
+import { useSyncState } from "../lib/useSync";
 import { CommentList } from "../components/CommentList";
 import { deleteSharedComment, fetchSharedComments, getOwnerName } from "../lib/share";
 import type { Comment } from "../lib/types";
@@ -38,7 +40,11 @@ export function RecipeDetail() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [id, sharing]);
   const location = useLocation();
-  const from = (location.state as { fromId?: string; fromTitle?: string; factor?: number } | null) ?? null;
+  const sync = useSyncState();
+  const from = (location.state as { fromId?: string; fromTitle?: string; factor?: number; fromShop?: boolean } | null) ?? null;
+  const [shopEntry, setShopEntry] = useState<string | null | undefined>(undefined); // 買い物リストに入っていればそのID
+  const [shopMsg, setShopMsg] = useState("");
+  useEffect(() => { if (id && sync.session) shoppingRecipeIds().then((m) => setShopEntry(m.get(id) ?? null)).catch(() => setShopEntry(null)); }, [id, sync.session]);
   const inherited = from?.factor && from.factor !== 1 ? from.factor : 1;
   // 「戻る」で戻ってきた時は、そのレシピで入れていた「今回」の分量を復元する
   const navType = useNavigationType();
@@ -92,7 +98,9 @@ export function RecipeDetail() {
   return (
     <div className="page detail">
       <header className="topbar">
-        {from?.fromId ? (
+        {from?.fromShop ? (
+          <Link to="/?view=shop" className="back">‹ 買い物リスト</Link>
+        ) : from?.fromId ? (
           <button className="link back" onClick={() => nav(-1)}>‹ {from.fromTitle}</button>
         ) : (
           <Link to="/" className="back">‹ 一覧</Link>
@@ -116,7 +124,24 @@ export function RecipeDetail() {
         );
       })()}
 
-      <div className="detail-actions"><CopyTextButton recipe={r} /></div>
+      <div className="detail-actions">
+        {sync.session && shopEntry !== undefined && (shopEntry ? (
+          <span className="shop-in">
+            <Link to="/?view=shop" className="btn small">🛒 リストに入っています</Link>
+            <button className="link small" onClick={async () => { await ownShopApi.removeEntry!(shopEntry); setShopEntry(null); setShopMsg("外しました"); }}>外す</button>
+          </span>
+        ) : (
+          <button className="btn small primary" onClick={async () => {
+            try {
+              await addRecipeToShopping(r, factor);
+              setShopEntry((await shoppingRecipeIds()).get(r.id) ?? null);
+              setShopMsg(factor !== 1 ? `今回の分量（×${Math.round(factor * 100) / 100}）で入れました` : "入れました");
+            } catch (e) { setShopMsg((e as Error).message); }
+          }}>🛒 買い物リストに入れる</button>
+        ))}
+        <CopyTextButton recipe={r} />
+      </div>
+      {shopMsg && <p className="hint small shop-msg">{shopMsg}</p>}
       <CookedPanel recipe={r} onChange={async (next) => { await update({ cookedDates: next.cookedDates }); }} />
 
       <section className="panel">
