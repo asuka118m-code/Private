@@ -10,6 +10,8 @@ import { fetchInbox, fetchRequests, type FoodRequest, type InboxItem } from "../
 import { RequestBoard } from "../components/RequestBoard";
 import { getMyName } from "../lib/profile";
 import { InboxBoard } from "../components/InboxBoard";
+import { ShoppingBoard } from "../components/ShoppingBoard";
+import { ownShopApi } from "../lib/shopping";
 
 type CookFilter = "all" | "cooked" | "notyet";
 type SortKey = "updated" | "recent" | "longago";
@@ -30,10 +32,11 @@ export function RecipeList() {
   const [requests, setRequests] = useState<FoodRequest[]>([]);
   const openRequests = requests.filter((x) => !x.done).length;
   const [params, setParams] = useSearchParams();
-  const view = params.get("view"); // "requests" | "inbox" | null（レシピ）
+  const view = params.get("view"); // "requests" | "inbox" | "shop" | null（レシピ）
+  const showShop = view === "shop";
   const showRequests = view === "requests";
   const showInbox = view === "inbox";
-  const setView = (v: "requests" | "inbox" | null) => setParams(v ? { view: v } : {}, { replace: true });
+  const setView = (v: "requests" | "inbox" | "shop" | null) => setParams(v ? { view: v } : {}, { replace: true });
   const setShowRequests = (on: boolean) => setView(on ? "requests" : null);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [myName, setMyName] = useState<string | null>(null);
@@ -99,6 +102,7 @@ export function RecipeList() {
       {sync.session && (
         <nav className="view-tabs" aria-label="表示の切り替え">
           <button className={!view ? "on" : ""} onClick={() => setView(null)}>📖 レシピ</button>
+          <button className={showShop ? "on" : ""} onClick={() => setView("shop")}>🛒 買い物</button>
           <button className={showRequests ? "on" : ""} onClick={() => setView("requests")}>
             🙋 リクエスト{openRequests > 0 && <span className="tab-count">{openRequests}</span>}
           </button>
@@ -108,7 +112,9 @@ export function RecipeList() {
           <Link to="/friends">👥 友だち</Link>
         </nav>
       )}
-      {showRequests ? (
+      {showShop ? (
+        <ShoppingBoard api={ownShopApi} />
+      ) : showRequests ? (
         <RequestBoard requests={requests} recipes={recipes ?? []} onChange={setRequests} />
       ) : showInbox ? (
         <InboxBoard items={inbox} recipes={recipes ?? []} onChange={setInbox} />
@@ -177,7 +183,7 @@ export function RecipeList() {
         })}
       </ul>
       </>)}
-      <Link to="/import" className="fab" aria-label="レシピを追加">＋</Link>
+      {!view && <Link to="/import" className="fab" aria-label="レシピを追加">＋</Link>}
       {sharing && <ShareDialog recipeId={null} title="レシピ一覧" onClose={() => setSharing(false)} />}
     </div>
   );

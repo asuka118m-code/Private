@@ -54,6 +54,10 @@ Vercel の `ALLOWED_EMAILS` は「AIを使える人」の意味になる（自�
 
 SQL Editor で `supabase/006_friends.sql` の中身を全部貼り付けて **Run**（1回だけ）。
 
+### 1-追加6. 買い物リスト用の設定
+
+SQL Editor で `supabase/007_shopping.sql` の中身を全部貼り付けて **Run**（1回だけ）。
+
 ## 2. Anthropic（スクショ読み取りのAI）
 
 AIを使わない場合（テキスト貼り付けだけで使う場合）はこの手順を飛ばしてOKです。
