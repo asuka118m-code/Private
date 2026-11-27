@@ -4,6 +4,7 @@
   "functions": { "api/index.mjs": { "maxDuration": 60 } },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/s/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

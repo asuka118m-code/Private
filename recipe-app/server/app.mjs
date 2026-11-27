@@ -3,6 +3,7 @@ import express from "express";
 import { createClient } from "@supabase/supabase-js";
 import { cleanTitle, parseRecipeHtml, parseRecipeText } from "./parse.mjs";
 import { aiAvailable, extractWithClaude } from "./ai.mjs";
+import { appTemplate, renderSharePage } from "./ssr.mjs";
 
 const app = express();
 app.use(express.json({ limit: "25mb" }));
@@ -33,6 +34,32 @@ async function requireUser(req, res, next) {
   req.aiAllowed = aiAllowedFor(user);
   next();
 }
+
+// ---- 共有リンクのページ（中身入り）と、その写真 ----
+const originOf = (req) => `${req.headers["x-forwarded-proto"] || req.protocol}://${req.get("host")}`;
+
+app.get(["/s/:token", "/s/:token/r/:recipeId"], async (req, res, next) => {
+  if (!supabase) return next(); // ローカル開発（Supabase未設定）は普通のページ
+  const origin = originOf(req);
+  try {
+    const html = await renderSharePage(supabase, { token: req.params.token, recipeId: req.params.recipeId, origin });
+    res.set("cache-control", "public, max-age=0, s-maxage=60, stale-while-revalidate=600");
+    res.type("html").send(html ?? (await appTemplate(origin)));
+  } catch {
+    try { res.type("html").send(await appTemplate(origin)); } catch { next(); }
+  }
+});
+
+// 共有中のレシピの写真（プレビュー画像用）。見られるかどうかは Supabase の設定（共有中のものだけ）で決まる
+app.get("/api/share-image/:owner/:image", async (req, res) => {
+  if (!supabase) return res.status(404).end();
+  const { owner, image } = req.params;
+  if (!/^[0-9a-f-]{36}$/i.test(owner) || !/^[\w-]{1,80}$/.test(image)) return res.status(400).end();
+  const { data, error } = await supabase.storage.from("recipe-images").download(`${owner}/${image}`);
+  if (error || !data) return res.status(404).end();
+  res.set("cache-control", "public, max-age=3600, s-maxage=86400");
+  res.type(data.type || "image/jpeg").send(Buffer.from(await data.arrayBuffer()));
+});
 
 app.get("/api/status", async (req, res) => {
   if (!supabase) return res.json({ ai: aiAvailable() });
