@@ -6,6 +6,7 @@ import { RequestForm } from "../components/RequestForm";
 import { GuestNameField } from "../components/GuestName";
 import { useSyncState } from "../lib/useSync";
 import { copySharedRecipe } from "../lib/copy";
+import { CopyTextButton } from "../components/CopyTextButton";
 import { addFriendComment, getFriendRecipe } from "../lib/friends";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { CommentList } from "../components/CommentList";
@@ -81,6 +82,7 @@ export function SharedRecipePage() {
       )}
       <h1 className="recipe-title">{r.title}</h1>
       {r.servings && <div className="servings">{r.servings}</div>}
+      <div className="detail-actions"><CopyTextButton recipe={r} url={friendId ? undefined : location.href.split("?")[0]} /></div>
 
       <section className="panel">
         <h2>材料</h2>

@@ -276,3 +276,4 @@ button.notice { width: 100%; text-align: left; border: 0; font: inherit; cursor:
   .ing-edit .amount { grid-area: amount; width: auto; min-width: 0; }
   .ing-edit .row-tools { grid-area: tools; }
 }
+.detail-actions { display: flex; gap: 8px; justify-content: flex-end; margin: -6px 0 10px; }
