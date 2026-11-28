@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { deleteInbox, setInboxDone, type InboxItem } from "../lib/share";
+import { closeSameUrl, deleteInbox, setInboxDone, type InboxItem } from "../lib/share";
 import { setPendingRequest } from "../lib/draft";
 import type { Recipe } from "../lib/types";
 
@@ -41,7 +41,8 @@ export function InboxBoard({ items, recipes, onChange }: { items: InboxItem[]; r
         ) : (
           <div className="req-actions-row">
             <button className="btn small primary" onClick={() => accept(i)}>OK、レシピにする</button>
-            <button className="btn small" onClick={() => act(() => setInboxDone(i.id, true), (l) => l.map((x) => (x.id === i.id ? { ...x, done: true } : x)))}>登録しない</button>
+            <button className="btn small" onClick={() => act(async () => { await setInboxDone(i.id, true); await closeSameUrl(i.url, i.id); },
+              (l) => l.map((x) => (x.id === i.id || (i.url && x.url === i.url && !x.done) ? { ...x, done: true } : x)))}>登録しない</button>
           </div>
         )}
       </li>

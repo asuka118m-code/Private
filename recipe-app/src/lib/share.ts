@@ -200,15 +200,44 @@ export async function fetchInbox(): Promise<InboxItem[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.from("inbox").select("id, url, text, done, accepted_recipe_id, created_at").order("created_at", { ascending: false });
   if (error) return [];
-  return data.map((i) => ({ id: i.id, url: i.url, text: i.text, done: i.done, acceptedRecipeId: i.accepted_recipe_id, createdAt: Date.parse(i.created_at) }));
+  const items: InboxItem[] = data.map((i) => ({ id: i.id, url: i.url, text: i.text, done: i.done, acceptedRecipeId: i.accepted_recipe_id, createdAt: Date.parse(i.created_at) }));
+  // 同じURLの重複を片付ける：それより新しい「済み」がある古い未処理と、新しい未処理がある古い未処理は済みにする
+  const dupes = findInboxDuplicates(items);
+  if (dupes.length) {
+    supabase.from("inbox").update({ done: true }).in("id", dupes).then(() => {}, () => {});
+    for (const it of items) if (dupes.includes(it.id)) it.done = true;
+  }
+  return items;
+}
+
+/** 片付けるべき重複のID（items は新しい順） */
+export function findInboxDuplicates(items: InboxItem[]): string[] {
+  const seen = new Map<string, InboxItem>(); // URLごとの、いちばん新しいもの
+  const out: string[] = [];
+  for (const it of items) {
+    if (!it.url) continue;
+    const newer = seen.get(it.url);
+    if (!newer) { seen.set(it.url, it); continue; }
+    if (!it.done) out.push(it.id); // もっと新しい同じURLがある（済み・未処理どちらでも）
+  }
+  return out;
+}
+
+/** 同じURLの未処理をまとめて済みにする（「登録しない」「レシピにした」のとき） */
+export async function closeSameUrl(url: string | null | undefined, exceptId?: string) {
+  if (!supabase || !url) return;
+  let q = supabase.from("inbox").update({ done: true }).eq("url", url).eq("done", false);
+  if (exceptId) q = q.neq("id", exceptId);
+  await q;
 }
 export async function setInboxDone(id: string, done: boolean) {
   const { error } = await need().from("inbox").update({ done }).eq("id", id);
   msg(error, "更新できませんでした");
 }
 export async function acceptInbox(id: string, recipeId: string) {
-  const { error } = await need().from("inbox").update({ done: true, accepted_recipe_id: recipeId }).eq("id", id);
+  const { data, error } = await need().from("inbox").update({ done: true, accepted_recipe_id: recipeId }).eq("id", id).select("url");
   msg(error, "更新できませんでした");
+  await closeSameUrl(data?.[0]?.url, id);
 }
 export async function deleteInbox(id: string) {
   const { error } = await need().from("inbox").delete().eq("id", id);
