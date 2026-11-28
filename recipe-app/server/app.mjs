@@ -1,7 +1,8 @@
 // API本体（ローカル実行・Vercel共通）
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
-import { cleanTitle, parseRecipeHtml, parseRecipeText } from "./parse.mjs";
+import { cleanTitle, parseRecipeHtml, parseRecipeText, snsCaption } from "./parse.mjs";
+import { fetchFullCaption, snsTitle } from "./sns.mjs";
 import { aiAvailable, extractWithClaude } from "./ai.mjs";
 import { appTemplate, renderSharePage } from "./ssr.mjs";
 
@@ -89,8 +90,14 @@ app.post("/api/import/url", async (req, res) => {
       },
       signal: AbortSignal.timeout(15000),
     });
-    if (!r.ok) throw new Error(`ページを読み込めませんでした（${r.status}）。ログインが必要なページかもしれません`);
-    const parsed = parseRecipeHtml(await r.text(), target.href);
+    const html = r.ok ? await r.text() : "";
+    const full = snsCaption(await fetchFullCaption(target, html));
+    if (!r.ok && !full) throw new Error(`ページを読み込めませんでした（${r.status}）。ログインが必要なページかもしれません`);
+    const parsed = r.ok ? parseRecipeHtml(html, target.href) : { found: false, title: "", description: "", imageUrl: "", pageText: "" };
+    if (!parsed.found) {
+      // プレビュー用の説明文は途中で切れることがあるので、取れれば全文のキャプションを使う
+      if (full.length > (parsed.description || "").replace(/[….]+$/, "").length - 5) parsed.description = full;
+    }
     if (parsed.found) {
       const { found, imageUrl, ...recipe } = parsed;
       return res.json({ recipes: [recipe], imageUrl, method: "structured" });
@@ -104,7 +111,7 @@ app.post("/api/import/url", async (req, res) => {
     const fromCaption = parsed.description ? parseRecipeText(parsed.description) : null;
     const guess = fromCaption && (fromCaption.ingredients.length || fromCaption.steps.length) ? fromCaption : parseRecipeText(parsed.pageText || "");
     // キャプションから読めた時はその料理名、読めない時はページの題名を整えて使う
-    const title = (fromCaption && guess === fromCaption && guess.title) || cleanTitle(parsed.title) || guess.title;
+    const title = (fromCaption && guess === fromCaption && guess.title) || cleanTitle(snsTitle(parsed.title)) || guess.title;
     return res.json({ recipes: [{ ...guess, title }], imageUrl: parsed.imageUrl, method: "text" });
   } catch (e) {
     const m = errMsg(e);

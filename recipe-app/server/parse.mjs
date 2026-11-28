@@ -70,7 +70,9 @@ export function parseRecipeHtml(html, baseUrl) {
  * Instagram: 「123 likes, 4 comments - user on November 1, 2026: "本文…"」→「本文…」
  */
 export function snsCaption(desc) {
-  const s = String(desc || "").trim();
-  const m = s.match(/^[\s\S]*?(?:likes?|いいね)[\s\S]*?[-–]\s*[^:：]+?(?:on|、)[^:：]*[:：]\s*["“「]([\s\S]*)["”」]\.?\s*$/i);
-  return (m ? m[1] : s).replace(/\\n/g, "\n").trim();
+  let s = String(desc || "").trim();
+  // 「123 likes, 4 comments - user on …: "」「いいね！123件、コメント4件 - user、…: "」の前置きを外す（終わりのカッコが無い＝途中で切れていても外す）
+  const m = s.match(/^[^\n]{0,250}?(?:likes?|いいね|comments?|コメント)[^\n]{0,250}?[:：]\s*["“「]/i);
+  if (m) s = s.slice(m[0].length).replace(/["”」]\.?\s*$/, "");
+  return s.replace(/\\n/g, "\n").trim();
 }
