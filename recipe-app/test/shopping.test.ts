@@ -39,3 +39,16 @@ describe("買い物リストのまとめ", () => {
     expect(items.map((i) => i.name)).toEqual(["玉ねぎ", "醤油", "塩", "豚ロース", "牛乳"]);
   });
 });
+
+import { findInboxDuplicates } from "../src/lib/share";
+describe("あとで登録の重複", () => {
+  it("同じURLの古い未処理を片付ける（新しい順で渡す）", () => {
+    const items = [
+      { id: "c", url: "https://x/1", text: "", createdAt: 3, done: false }, // 読み込み直しで増えた新しいもの
+      { id: "b", url: "https://x/1", text: "", createdAt: 2, done: true }, // 「登録しない」にしたもの
+      { id: "a", url: "https://x/1", text: "", createdAt: 1, done: false }, // さらに前の重複
+      { id: "d", url: "https://x/2", text: "", createdAt: 1, done: false },
+    ];
+    expect(findInboxDuplicates(items)).toEqual(["a"]);
+  });
+});

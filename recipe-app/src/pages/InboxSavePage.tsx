@@ -19,6 +19,13 @@ export function InboxSavePage() {
   const [error, setError] = useState("");
   const [manual, setManual] = useState("");
   const ran = useRef(false);
+  const LAST = `recipe-app:inbox-last:${token}`;
+
+  // 保存・送信したら、ページのアドレスからURLを消す（Safariがページを読み込み直しても、もう一度保存しない）
+  function finish(kind: "saved" | "sent", url: string, label = "") {
+    sessionStorage.setItem(LAST, JSON.stringify({ kind, url, label, at: Date.now() }));
+    history.replaceState(null, "", location.pathname);
+  }
 
   async function save(url: string) {
     setState("saving"); setError("");
@@ -26,6 +33,7 @@ export function InboxSavePage() {
       await addInbox(token, url);
       setSaved(url);
       setState("saved");
+      finish("saved", url);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setState("error");
@@ -36,6 +44,16 @@ export function InboxSavePage() {
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;
+    // 読み込み直した時：さっき保存したものなら「保存しました」の表示のままにする
+    if (!incoming) {
+      try {
+        const last = JSON.parse(sessionStorage.getItem(LAST) || "null");
+        if (last && Date.now() - last.at < 30 * 60 * 1000) {
+          if (last.kind === "sent") { setSentTo(last.label); setSaved(last.url); setState("sent"); } else { setSaved(last.url); setState("saved"); }
+          return;
+        }
+      } catch { /* 何もしない */ }
+    }
     getInboxTargets(token).then((t) => {
       setTargets(t);
       if (!incoming) setState("idle");
@@ -50,7 +68,9 @@ export function InboxSavePage() {
     try {
       await addRequestViaInbox(token, id, incoming, note.trim());
       setSentTo(label);
+      setSaved(incoming);
       setState("sent");
+      finish("sent", incoming, label);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setState("choose");
@@ -87,7 +107,7 @@ export function InboxSavePage() {
         {state === "sent" && (
           <>
             <h2>🙋 {sentTo}さんにリクエストしました</h2>
-            <p className="share-url">{incoming}</p>
+            <p className="share-url">{saved || incoming}</p>
             <p className="hint">このページは閉じて大丈夫です。</p>
           </>
         )}
