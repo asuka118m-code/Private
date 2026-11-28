@@ -83,3 +83,28 @@ A みりん 大さじ2
     expect(youtubeDescription(`..."shortDescription":"親子丼\\n材料\\n卵 2個","isCrawlable"...`)).toBe("親子丼\n材料\n卵 2個");
   });
 });
+
+describe("材料だけの投稿（おにぎり）", () => {
+  it("▷の箇条書き・飾り線・作り方なし", () => {
+    const r = parseRecipeText(`忙しい朝の味方になる冷凍おにぎり🍙
+味噌バターおにぎり
+
+材料——————————*☼*
+
+▷ご飯…1合
+▷味噌…大さじ1/2
+▷バター…5g
+▷鮭フレーク…大さじ２
+▷焼き海苔…全形１枚
+▷醤油…小さじ１
+
+*☼*—————*☼*—————*☼*
+
+#おにぎり #味噌 #バター #鮭
+︵︵︵︵︵︵︵︵︵︵︵︵︵︵。⁂.ꕤ。◌⁘".`);
+    expect(r.ingredients.map((i) => i.name)).toEqual(["ご飯", "味噌", "バター", "鮭フレーク", "焼き海苔", "醤油"]);
+    expect(r.ingredients[0].amount).toBe("1合");
+    expect(r.steps).toEqual([]);
+    expect(r.memo).toBe("");
+  });
+});

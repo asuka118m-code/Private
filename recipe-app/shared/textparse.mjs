@@ -21,10 +21,15 @@ export function takeMark(line) {
   return { mark: toHalf(m[1]), rest };
 }
 
+/** 行頭の箇条書きの記号（「▷ご飯」「・醤油」など） */
+const BULLET = /^[・\-\*✓✔︎•·▷▶►▸▹▻›≫»→⇒➤➢➣➔☞✧✦◦‣❥ᐅ]+\uFE0F?\s*/u;
+/** 文字も数字も無い、飾りだけの行（「*☼*———*☼*」「︵︵︵。⁂」など） */
+export const isDecoLine = (l) => !!String(l).trim() && !/[ぁ-んァ-ヶ一-龠々a-zA-Z0-9０-９Ａ-Ｚａ-ｚ]/.test(String(l).replace(/#\S+/g, ""));
+
 /** 材料の1行を「名前」と「分量」（と印）に分ける。例: "玉ねぎ 1/2個" → {name:"玉ねぎ", amount:"1/2個"} */
 export function splitIngredient(line) {
   let s = String(line).replace(/\s+/g, " ").trim();
-  s = s.replace(/^[・\-\*✓✔︎•·]+\s*/, "");
+  s = s.replace(BULLET, "");
   const { mark, rest } = takeMark(s);
   if (mark && !rest) return null; // 見出しだけの行
   const ing = splitIngredientBody(rest);
@@ -195,7 +200,7 @@ export function parseRecipeText(text) {
 
   const findServings = (line) => line.match(/[0-9０-９]+(?:\s*[〜~\-]\s*[0-9０-９]+)?\s*(?:人分|人前|個分|皿分|台分|枚分|本分|杯分|合分)/)?.[0] ?? "";
   const pushIngredients = (line) => {
-    const head = takeMark(line.replace(/^[・\-\*•·]+\s*/, ""));
+    const head = takeMark(line.replace(BULLET, ""));
     if (head.mark && !head.rest) { groupMark = head.mark; return; } // 「【A】」「A（合わせ調味料）」の見出し行
     for (const ing of splitIngredientLine(line)) ingredients.push(!ing.mark && groupMark ? { ...ing, mark: groupMark } : ing);
   };
@@ -211,7 +216,16 @@ export function parseRecipeText(text) {
     const t = line.match(TITLE_HEAD);
     if (t) { if (!title) title = t[2].trim(); continue; }
     if (HASHTAGS.test(line)) continue;
-    if (SEPARATOR_LINE.test(line)) { if (mode !== "none") mode = "after"; continue; }
+    if (SEPARATOR_LINE.test(line) || isDecoLine(line)) {
+      // 材料のあとの飾り線：次の行が材料ならそのまま続ける。そうでなければ材料の欄はおしまい
+      if (mode === "ing") mode = "ingEnd"; else if (mode !== "none") mode = "after";
+      continue;
+    }
+    if (mode === "ingEnd") {
+      const deco2 = stripDeco(line);
+      const goOn = ingredientLike(line) || takeMark(line.replace(BULLET, "")).mark || isIngHead(deco2) || SUB_HEAD.test(deco2) || STEP_HEAD.test(deco2.replace(EMOJI, "").trim()) || MEMO_HEAD.test(deco2.replace(EMOJI, "").trim()) || STEP_NUM.test(line) || PROMO.test(line);
+      mode = goOn ? "ing" : "after";
+    }
 
     // 見出し
     if (isIngHead(deco)) {
